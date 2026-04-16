@@ -209,6 +209,12 @@ class FirebaseTrackingService extends ChangeNotifier {
     await _positionSubscription?.cancel();
     _positionSubscription = null;
     _sharingUserId = null;
+    _userLocations.remove(userId);
+    _userSpeedsKmh.remove(userId);
+    await FirebaseFirestore.instance
+        .collection('locations')
+        .doc(userId)
+        .delete();
     notifyListeners();
   }
 
