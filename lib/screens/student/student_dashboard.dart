@@ -1,13 +1,33 @@
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_tracking_service.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 import '../../widgets/app_map_tile_layer.dart';
 
 class StudentDashboard extends StatelessWidget {
   const StudentDashboard({super.key});
+
+  String _distanceLabel(LatLng? from, LatLng? to) {
+    if (from == null) return 'Start sharing to calculate distance';
+    if (to == null) return 'Location unavailable';
+
+    final meters = Geolocator.distanceBetween(
+      from.latitude,
+      from.longitude,
+      to.latitude,
+      to.longitude,
+    );
+
+    if (meters < 1000) {
+      return '${meters.round()} m away';
+    }
+
+    return '${(meters / 1000).toStringAsFixed(1)} km away';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,13 +39,14 @@ class StudentDashboard extends StatelessWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    trackingService.startSharingLocation(user.id);
-
     final allLocations = trackingService.getAllLocations();
+    final driverIds = trackingService.getDriverIds();
     final driverLocations = allLocations.entries
         .where((entry) => trackingService.isDriver(entry.key))
         .toList();
     final myLocation = trackingService.getLocation(user.id);
+    final isSharing = trackingService.isSharingLocation(user.id);
+    final isStarting = trackingService.isStartingLocationStream;
     final mapCenter =
         myLocation ??
         (driverLocations.isEmpty ? null : driverLocations.first.value);
@@ -60,6 +81,39 @@ class StudentDashboard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: isStarting
+                    ? null
+                    : () {
+                        if (isSharing) {
+                          trackingService.stopSharingLocation(user.id);
+                        } else {
+                          trackingService.startSharingLocation(user.id);
+                        }
+                      },
+                icon: isStarting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        isSharing ? Icons.location_disabled : Icons.my_location,
+                      ),
+                label: Text(
+                  isStarting
+                      ? 'Starting location sharing...'
+                      : isSharing
+                      ? 'Stop sharing location'
+                      : 'Start sharing location',
+                ),
+              ),
             ),
           ),
           Expanded(
@@ -142,6 +196,66 @@ class StudentDashboard extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             ),
+          SizedBox(
+            height: 190,
+            child: Card(
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.blue.shade100),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Drivers nearby',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: driverIds.isEmpty
+                          ? const Center(
+                              child: Text('No drivers available yet.'),
+                            )
+                          : ListView.separated(
+                              itemCount: driverIds.length,
+                              separatorBuilder: (context, index) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final driverId = driverIds[index];
+                                final driverLocation = trackingService
+                                    .getLocation(driverId);
+
+                                return ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(
+                                    Icons.directions_bus,
+                                    color: Colors.green,
+                                  ),
+                                  title: Text(
+                                    trackingService.displayNameFor(driverId),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    _distanceLabel(myLocation, driverLocation),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

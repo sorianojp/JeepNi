@@ -21,6 +21,11 @@ class FirebaseTrackingService extends ChangeNotifier {
   String? _locationError;
 
   String? get locationError => _locationError;
+  bool get isStartingLocationStream => _isStartingLocationStream;
+
+  bool isSharingLocation(String userId) {
+    return _positionSubscription != null && _sharingUserId == userId;
+  }
 
   FirebaseTrackingService() {
     _authSubscription = fb.FirebaseAuth.instance.authStateChanges().listen((
@@ -183,6 +188,18 @@ class FirebaseTrackingService extends ChangeNotifier {
         );
     _sharingUserId = userId;
     _isStartingLocationStream = false;
+    notifyListeners();
+  }
+
+  Future<void> stopSharingLocation(String userId) async {
+    if (_sharingUserId != userId) {
+      return;
+    }
+
+    await _positionSubscription?.cancel();
+    _positionSubscription = null;
+    _sharingUserId = null;
+    notifyListeners();
   }
 
   Future<bool> _ensureLocationPermission() async {
@@ -243,6 +260,11 @@ class FirebaseTrackingService extends ChangeNotifier {
   bool isDriver(String userId) {
     _ensureListening();
     return _driverIds.contains(userId);
+  }
+
+  List<String> getDriverIds() {
+    _ensureListening();
+    return List.unmodifiable(_driverIds);
   }
 
   bool isStudent(String userId) {
