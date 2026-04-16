@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_tracking_service.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:go_router/go_router.dart';
 import '../../widgets/app_map_tile_layer.dart';
 
@@ -74,7 +73,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final authService = Provider.of<FirebaseAuthService>(context);
     final trackingService = Provider.of<FirebaseTrackingService>(context);
 
+    final user = authService.currentUser;
+    if (user != null) {
+      trackingService.startSharingLocation(user.id);
+    }
+
     final allLocations = trackingService.getAllLocations();
+    final myLocation = user == null
+        ? null
+        : trackingService.getLocation(user.id);
+    final mapCenter =
+        myLocation ?? (allLocations.isEmpty ? null : allLocations.values.first);
 
     return Scaffold(
       appBar: AppBar(
@@ -192,57 +201,62 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
           Expanded(
-            child: FlutterMap(
-              options: const MapOptions(
-                initialCenter: LatLng(14.595, 120.980),
-                initialZoom: 13.5,
-              ),
-              children: [
-                ColoredBox(color: Colors.grey.shade200),
-                const AppMapTileLayer(),
-                MarkerLayer(
-                  markers: allLocations.entries.map((entry) {
-                    final isDriver = trackingService.isDriver(entry.key);
-                    final displayName = trackingService.displayNameFor(
-                      entry.key,
-                    );
-                    return Marker(
-                      point: entry.value,
-                      width: 80,
-                      height: 80,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isDriver
-                                ? Icons.directions_bus
-                                : Icons.person_pin_circle,
-                            color: isDriver ? Colors.green : Colors.blue,
-                            size: isDriver ? 40 : 30,
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(2),
-                            color: Colors.white70,
-                            child: Text(
-                              displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
+            child: mapCenter == null
+                ? const Center(child: Text('Waiting for live locations...'))
+                : FlutterMap(
+                    key: ValueKey(
+                      '${mapCenter.latitude},${mapCenter.longitude}',
+                    ),
+                    options: MapOptions(
+                      initialCenter: mapCenter,
+                      initialZoom: 13.5,
+                    ),
+                    children: [
+                      ColoredBox(color: Colors.grey.shade200),
+                      const AppMapTileLayer(),
+                      MarkerLayer(
+                        markers: allLocations.entries.map((entry) {
+                          final isDriver = trackingService.isDriver(entry.key);
+                          final displayName = trackingService.displayNameFor(
+                            entry.key,
+                          );
+                          return Marker(
+                            point: entry.value,
+                            width: 80,
+                            height: 80,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isDriver
+                                      ? Icons.directions_bus
+                                      : Icons.person_pin_circle,
+                                  color: isDriver ? Colors.green : Colors.blue,
+                                  size: isDriver ? 40 : 30,
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.all(2),
+                                  color: Colors.white70,
+                                  child: Text(
+                                    displayName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
+                          );
+                        }).toList(),
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SimpleAttributionWidget(
-                  source: Text('OpenStreetMap, CARTO'),
-                ),
-              ],
-            ),
+                      const SimpleAttributionWidget(
+                        source: Text('OpenStreetMap, CARTO'),
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),

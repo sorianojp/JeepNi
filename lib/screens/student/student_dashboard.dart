@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_tracking_service.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:go_router/go_router.dart';
 import '../../widgets/app_map_tile_layer.dart';
 
@@ -26,10 +25,10 @@ class StudentDashboard extends StatelessWidget {
     final driverLocations = allLocations.entries
         .where((entry) => trackingService.isDriver(entry.key))
         .toList();
-    final myLocation =
-        trackingService.getLocation(user.id) ??
-        user.location ??
-        const LatLng(14.5995, 120.9842);
+    final myLocation = trackingService.getLocation(user.id);
+    final mapCenter =
+        myLocation ??
+        (driverLocations.isEmpty ? null : driverLocations.first.value);
 
     return Scaffold(
       appBar: AppBar(
@@ -64,45 +63,75 @@ class StudentDashboard extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: FlutterMap(
-              key: ValueKey('${myLocation.latitude},${myLocation.longitude}'),
-              options: MapOptions(initialCenter: myLocation, initialZoom: 15.0),
-              children: [
-                ColoredBox(color: Colors.grey.shade200),
-                const AppMapTileLayer(),
-                MarkerLayer(
-                  markers: [
-                    // My location marker
-                    Marker(
-                      point: myLocation,
-                      width: 80,
-                      height: 80,
-                      child: const Icon(
-                        Icons.person_pin_circle,
-                        color: Colors.blue,
-                        size: 40,
-                      ),
+            child: mapCenter == null
+                ? const Center(child: Text('Waiting for live location...'))
+                : FlutterMap(
+                    key: ValueKey(
+                      '${mapCenter.latitude},${mapCenter.longitude}',
                     ),
-                    // Driver location markers
-                    ...driverLocations.map(
-                      (driver) => Marker(
-                        point: driver.value,
-                        width: 80,
-                        height: 80,
-                        child: const Icon(
-                          Icons.directions_bus,
-                          color: Colors.green,
-                          size: 40,
-                        ),
-                      ),
+                    options: MapOptions(
+                      initialCenter: mapCenter,
+                      initialZoom: 15.0,
                     ),
-                  ],
-                ),
-                const SimpleAttributionWidget(
-                  source: Text('OpenStreetMap, CARTO'),
-                ),
-              ],
-            ),
+                    children: [
+                      ColoredBox(color: Colors.grey.shade200),
+                      const AppMapTileLayer(),
+                      MarkerLayer(
+                        markers: [
+                          if (myLocation != null)
+                            Marker(
+                              point: myLocation,
+                              width: 80,
+                              height: 80,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.person_pin_circle,
+                                    color: Colors.blue,
+                                    size: 40,
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.9,
+                                      ),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: const Text(
+                                      'Me',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ...driverLocations.map(
+                            (driver) => Marker(
+                              point: driver.value,
+                              width: 80,
+                              height: 80,
+                              child: const Icon(
+                                Icons.directions_bus,
+                                color: Colors.green,
+                                size: 40,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SimpleAttributionWidget(
+                        source: Text('OpenStreetMap, CARTO'),
+                      ),
+                    ],
+                  ),
           ),
           if (trackingService.locationError != null)
             Padding(

@@ -4,9 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
-import 'package:latlong2/latlong.dart';
 
-import '../core/app_defaults.dart';
 import '../models/user_model.dart';
 
 class FirebaseAuthService extends ChangeNotifier {
@@ -61,31 +59,11 @@ class FirebaseAuthService extends ChangeNotifier {
     );
   }
 
-  LatLng _defaultLocationForRole(UserRole role) {
-    return AppDefaults.roleLocations[role] ??
-        AppDefaults.roleLocations[UserRole.admin]!;
-  }
-
-  Future<void> _writeProfile(
-    UserModel profile, {
-    bool writeLocationDoc = true,
-  }) async {
+  Future<void> _writeProfile(UserModel profile) async {
     await FirebaseFirestore.instance
         .collection('users')
         .doc(profile.id)
         .set(profile.toFirestore());
-
-    final location = profile.location;
-    if (writeLocationDoc && location != null) {
-      await FirebaseFirestore.instance
-          .collection('locations')
-          .doc(profile.id)
-          .set({
-            'latitude': location.latitude,
-            'longitude': location.longitude,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-    }
   }
 
   Future<FirebaseApp> _createTemporaryAuthApp() {
@@ -121,19 +99,20 @@ class FirebaseAuthService extends ChangeNotifier {
     required String name,
   }) async {
     _lastError = null;
+    fb.User? createdAuthUser;
+
     try {
       final credential = await fb.FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
-      final authUser = credential.user!;
-      await authUser.updateDisplayName(name);
+      createdAuthUser = credential.user!;
+      await createdAuthUser.updateDisplayName(name);
 
       final profile = UserModel(
-        id: authUser.uid,
+        id: createdAuthUser.uid,
         email: email,
         name: name,
         role: UserRole.student,
-        location: _defaultLocationForRole(UserRole.student),
       );
 
       await _writeProfile(profile);
@@ -142,11 +121,24 @@ class FirebaseAuthService extends ChangeNotifier {
       notifyListeners();
       return true;
     } on fb.FirebaseAuthException catch (error) {
+      await _deleteIncompleteAuthUser(createdAuthUser);
       _lastError = error.message ?? error.code;
       return false;
     } catch (error) {
+      await _deleteIncompleteAuthUser(createdAuthUser);
       _lastError = error.toString();
       return false;
+    }
+  }
+
+  Future<void> _deleteIncompleteAuthUser(fb.User? user) async {
+    if (user == null) return;
+
+    try {
+      await user.delete();
+    } catch (error) {
+      debugPrint('Could not delete incomplete auth user: $error');
+      await fb.FirebaseAuth.instance.signOut();
     }
   }
 
@@ -181,10 +173,9 @@ class FirebaseAuthService extends ChangeNotifier {
         email: email,
         name: name,
         role: UserRole.driver,
-        location: _defaultLocationForRole(UserRole.driver),
       );
 
-      await _writeProfile(profile, writeLocationDoc: false);
+      await _writeProfile(profile);
       await temporaryAuth.signOut();
       return true;
     } on fb.FirebaseAuthException catch (error) {

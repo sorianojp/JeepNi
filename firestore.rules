@@ -15,19 +15,10 @@ service cloud.firestore {
     }
 
     function validProfile(data) {
-      return data.email is string
+      return data.keys().hasOnly(['email', 'name', 'role'])
+        && data.email is string
         && data.name is string
-        && validRole(data.role)
-        && !('assignedDriverId' in data)
-        && validLocation(data);
-    }
-
-    function validLocation(data) {
-      return data.location == null
-        || (
-          data.location.latitude is number
-          && data.location.longitude is number
-        );
+        && validRole(data.role);
     }
 
     function userExists(userId) {
@@ -44,7 +35,6 @@ service cloud.firestore {
 
       allow create: if (
         isOwnDoc(userId)
-        && request.resource.data.email == request.auth.token.email
         && request.resource.data.role == 'student'
         && validProfile(request.resource.data)
       ) || (
@@ -55,10 +45,10 @@ service cloud.firestore {
       );
 
       allow update: if isOwnDoc(userId)
+        && request.resource.data.keys().hasOnly(['email', 'name', 'role'])
         && request.resource.data.email == resource.data.email
         && request.resource.data.role == resource.data.role
-        && validRole(request.resource.data.role)
-        && validLocation(request.resource.data);
+        && validRole(request.resource.data.role);
 
       allow delete: if isOwnDoc(userId);
     }

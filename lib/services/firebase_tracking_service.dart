@@ -15,10 +15,22 @@ class FirebaseTrackingService extends ChangeNotifier {
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _usersSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subscription;
   StreamSubscription<Position>? _positionSubscription;
+  StreamSubscription<fb.User?>? _authSubscription;
+  String? _sharingUserId;
   bool _isStartingLocationStream = false;
   String? _locationError;
 
   String? get locationError => _locationError;
+
+  FirebaseTrackingService() {
+    _authSubscription = fb.FirebaseAuth.instance.authStateChanges().listen((
+      user,
+    ) {
+      if (user == null || user.uid != _sharingUserId) {
+        _stopListening();
+      }
+    });
+  }
 
   void _ensureListening() {
     if (fb.FirebaseAuth.instance.currentUser == null) {
@@ -105,6 +117,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     _subscription = null;
     _positionSubscription?.cancel();
     _positionSubscription = null;
+    _sharingUserId = null;
     _isStartingLocationStream = false;
     _driverIds.clear();
     _studentIds.clear();
@@ -118,9 +131,17 @@ class FirebaseTrackingService extends ChangeNotifier {
     final currentUser = fb.FirebaseAuth.instance.currentUser;
     if (currentUser == null ||
         currentUser.uid != userId ||
-        _positionSubscription != null ||
         _isStartingLocationStream) {
       return;
+    }
+
+    if (_positionSubscription != null && _sharingUserId == userId) {
+      return;
+    }
+
+    if (_positionSubscription != null && _sharingUserId != userId) {
+      await _positionSubscription?.cancel();
+      _positionSubscription = null;
     }
 
     _isStartingLocationStream = true;
@@ -131,9 +152,19 @@ class FirebaseTrackingService extends ChangeNotifier {
       return;
     }
 
-    final lastKnown = await Geolocator.getLastKnownPosition();
-    if (lastKnown != null) {
-      await _writePosition(userId, lastKnown);
+    try {
+      final currentPosition = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+        ),
+      );
+      await _writePosition(userId, currentPosition);
+    } catch (error) {
+      debugPrint('Current location lookup failed: $error');
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        await _writePosition(userId, lastKnown);
+      }
     }
 
     _positionSubscription =
@@ -150,6 +181,7 @@ class FirebaseTrackingService extends ChangeNotifier {
             notifyListeners();
           },
         );
+    _sharingUserId = userId;
     _isStartingLocationStream = false;
   }
 
@@ -236,6 +268,8 @@ class FirebaseTrackingService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
+    _authSubscription = null;
     _stopListening();
     super.dispose();
   }
