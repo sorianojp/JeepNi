@@ -10,7 +10,7 @@ import '../../widgets/app_map_tile_layer.dart';
 class AdminMapScreen extends StatelessWidget {
   const AdminMapScreen({super.key});
 
-  static const LatLng _defaultMapCenter = LatLng(15.9574705, 120.4419412);
+  static const LatLng _dagupanCenter = LatLng(16.0433, 120.3333);
 
   @override
   Widget build(BuildContext context) {
@@ -36,8 +36,8 @@ class AdminMapScreen extends StatelessWidget {
         children: [
           FlutterMap(
             options: const MapOptions(
-              initialCenter: _defaultMapCenter,
-              initialZoom: 10.5,
+              initialCenter: _dagupanCenter,
+              initialZoom: 12.5,
             ),
             children: [
               ColoredBox(color: Colors.grey.shade200),

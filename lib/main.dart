@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'services/firebase_auth_service.dart';
@@ -29,15 +30,40 @@ Future<void> _initializeFirebase() async {
   }
 }
 
-class JeepNiApp extends StatelessWidget {
+class JeepNiApp extends StatefulWidget {
   const JeepNiApp({super.key});
+
+  @override
+  State<JeepNiApp> createState() => _JeepNiAppState();
+}
+
+class _JeepNiAppState extends State<JeepNiApp> {
+  late final FirebaseAuthService _authService;
+  late final FirebaseTrackingService _trackingService;
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _authService = FirebaseAuthService();
+    _trackingService = FirebaseTrackingService();
+    _router = createRouter(_authService);
+  }
+
+  @override
+  void dispose() {
+    _authService.dispose();
+    _trackingService.dispose();
+    _router.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => FirebaseAuthService()),
-        ChangeNotifierProvider(create: (_) => FirebaseTrackingService()),
+        ChangeNotifierProvider.value(value: _authService),
+        ChangeNotifierProvider.value(value: _trackingService),
       ],
       child: MaterialApp.router(
         title: 'JeepNi Tracking',
@@ -45,7 +71,7 @@ class JeepNiApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
           useMaterial3: true,
         ),
-        routerConfig: router,
+        routerConfig: _router,
       ),
     );
   }

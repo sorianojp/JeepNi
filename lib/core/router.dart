@@ -7,56 +7,77 @@ import '../screens/admin/admin_create_driver_screen.dart';
 import '../screens/admin/admin_map_screen.dart';
 import '../services/firebase_auth_service.dart';
 import '../models/user_model.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/material.dart';
 
-final router = GoRouter(
-  initialLocation: '/login',
-  redirect: (context, state) {
-    final authService = Provider.of<FirebaseAuthService>(
-      context,
-      listen: false,
-    );
-    final isAuthenticated = authService.currentUser != null;
-
-    if (!isAuthenticated && state.matchedLocation != '/login') {
-      return '/login';
-    }
-
-    if (isAuthenticated && state.matchedLocation == '/login') {
-      final role = authService.currentUser!.role;
-      switch (role) {
-        case UserRole.student:
-          return '/student';
-        case UserRole.driver:
-          return '/driver';
-        case UserRole.admin:
-          return '/admin';
+GoRouter createRouter(FirebaseAuthService authService) {
+  return GoRouter(
+    initialLocation: '/',
+    refreshListenable: authService,
+    redirect: (context, state) {
+      if (!authService.isInitialized) {
+        return null;
       }
-    }
 
-    return null;
-  },
-  routes: [
-    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-    GoRoute(
-      path: '/student',
-      builder: (context, state) => const StudentDashboard(),
-    ),
-    GoRoute(
-      path: '/driver',
-      builder: (context, state) => const DriverDashboard(),
-    ),
-    GoRoute(
-      path: '/admin',
-      builder: (context, state) => const AdminDashboard(),
-    ),
-    GoRoute(
-      path: '/admin/map',
-      builder: (context, state) => const AdminMapScreen(),
-    ),
-    GoRoute(
-      path: '/admin/drivers',
-      builder: (context, state) => const AdminCreateDriverScreen(),
-    ),
-  ],
-);
+      final isAuthenticated = authService.currentUser != null;
+
+      if (!isAuthenticated && state.matchedLocation == '/') {
+        return '/login';
+      }
+
+      if (!isAuthenticated && state.matchedLocation != '/login') {
+        return '/login';
+      }
+
+      if (isAuthenticated &&
+          (state.matchedLocation == '/' || state.matchedLocation == '/login')) {
+        final role = authService.currentUser!.role;
+        switch (role) {
+          case UserRole.student:
+            return '/student';
+          case UserRole.driver:
+            return '/driver';
+          case UserRole.admin:
+            return '/admin';
+        }
+      }
+
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const _AuthLoadingScreen(),
+      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/student',
+        builder: (context, state) => const StudentDashboard(),
+      ),
+      GoRoute(
+        path: '/driver',
+        builder: (context, state) => const DriverDashboard(),
+      ),
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminDashboard(),
+      ),
+      GoRoute(
+        path: '/admin/map',
+        builder: (context, state) => const AdminMapScreen(),
+      ),
+      GoRoute(
+        path: '/admin/drivers',
+        builder: (context, state) => const AdminCreateDriverScreen(),
+      ),
+    ],
+  );
+}
+
+class _AuthLoadingScreen extends StatelessWidget {
+  const _AuthLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+  }
+}

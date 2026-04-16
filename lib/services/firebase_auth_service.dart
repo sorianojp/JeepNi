@@ -10,9 +10,11 @@ import '../models/user_model.dart';
 class FirebaseAuthService extends ChangeNotifier {
   UserModel? _currentUser;
   String? _lastError;
+  bool _isInitialized = false;
 
   UserModel? get currentUser => _currentUser;
   String? get lastError => _lastError;
+  bool get isInitialized => _isInitialized;
 
   FirebaseAuthService() {
     _restoreCurrentUser();
@@ -21,6 +23,8 @@ class FirebaseAuthService extends ChangeNotifier {
   Future<void> _restoreCurrentUser() async {
     final authUser = fb.FirebaseAuth.instance.currentUser;
     if (authUser == null) {
+      _isInitialized = true;
+      notifyListeners();
       return;
     }
 
@@ -36,6 +40,7 @@ class FirebaseAuthService extends ChangeNotifier {
       await fb.FirebaseAuth.instance.signOut();
     }
 
+    _isInitialized = true;
     notifyListeners();
   }
 
