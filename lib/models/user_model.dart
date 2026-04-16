@@ -37,12 +37,6 @@ class UserModel {
   final String name;
   final UserRole role;
   LatLng? location;
-  
-  // Specific to driver - which route they are on
-  final String? routeId;
-  
-  // Specific to student - which driver they are waiting for / riding with
-  final String? assignedDriverId;
 
   UserModel({
     required this.id,
@@ -50,8 +44,6 @@ class UserModel {
     required this.name,
     required this.role,
     this.location,
-    this.routeId,
-    this.assignedDriverId,
   });
 
   UserModel copyWith({
@@ -60,8 +52,6 @@ class UserModel {
     String? name,
     UserRole? role,
     LatLng? location,
-    String? routeId,
-    String? assignedDriverId,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -69,8 +59,6 @@ class UserModel {
       name: name ?? this.name,
       role: role ?? this.role,
       location: location ?? this.location,
-      routeId: routeId ?? this.routeId,
-      assignedDriverId: assignedDriverId ?? this.assignedDriverId,
     );
   }
 
@@ -81,8 +69,6 @@ class UserModel {
       name: data['name'] as String? ?? id,
       role: userRoleFromValue(data['role']),
       location: latLngFromValue(data['location']),
-      routeId: data['routeId'] as String?,
-      assignedDriverId: data['assignedDriverId'] as String?,
     );
   }
 
@@ -93,12 +79,7 @@ class UserModel {
       'role': role.name,
       'location': location == null
           ? null
-          : {
-              'latitude': location!.latitude,
-              'longitude': location!.longitude,
-            },
-      'routeId': routeId,
-      'assignedDriverId': assignedDriverId,
+          : {'latitude': location!.latitude, 'longitude': location!.longitude},
     };
   }
 }

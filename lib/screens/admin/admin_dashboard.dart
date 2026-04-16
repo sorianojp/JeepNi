@@ -203,6 +203,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 MarkerLayer(
                   markers: allLocations.entries.map((entry) {
                     final isDriver = trackingService.isDriver(entry.key);
+                    final displayName = trackingService.displayNameFor(
+                      entry.key,
+                    );
                     return Marker(
                       point: entry.value,
                       width: 80,
@@ -221,7 +224,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             padding: const EdgeInsets.all(2),
                             color: Colors.white70,
                             child: Text(
-                              entry.key,
+                              displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,

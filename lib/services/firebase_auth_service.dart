@@ -20,20 +20,6 @@ class FirebaseAuthService extends ChangeNotifier {
     _restoreCurrentUser();
   }
 
-  Future<String?> _firstDriverId() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .where('role', isEqualTo: UserRole.driver.name)
-        .limit(1)
-        .get();
-
-    if (snapshot.docs.isEmpty) {
-      return null;
-    }
-
-    return snapshot.docs.first.id;
-  }
-
   Future<void> _restoreCurrentUser() async {
     final authUser = fb.FirebaseAuth.instance.currentUser;
     if (authUser == null) {
@@ -151,9 +137,8 @@ class FirebaseAuthService extends ChangeNotifier {
       );
 
       await _writeProfile(profile);
-      final linkedProfile = await _linkProfile(profile);
 
-      _currentUser = linkedProfile;
+      _currentUser = profile;
       notifyListeners();
       return true;
     } on fb.FirebaseAuthException catch (error) {
@@ -197,11 +182,9 @@ class FirebaseAuthService extends ChangeNotifier {
         name: name,
         role: UserRole.driver,
         location: _defaultLocationForRole(UserRole.driver),
-        routeId: AppDefaults.defaultRouteId,
       );
 
       await _writeProfile(profile, writeLocationDoc: false);
-      await _linkProfile(profile);
       await temporaryAuth.signOut();
       return true;
     } on fb.FirebaseAuthException catch (error) {
@@ -230,52 +213,6 @@ class FirebaseAuthService extends ChangeNotifier {
         }
       }
     }
-  }
-
-  Future<UserModel> _linkProfile(UserModel profile) async {
-    if (profile.role == UserRole.student) {
-      try {
-        final assignedDriverId = await _firstDriverId();
-        if (assignedDriverId == null) {
-          return profile;
-        }
-
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(profile.id)
-            .set({
-              'assignedDriverId': assignedDriverId,
-            }, SetOptions(merge: true));
-
-        return profile.copyWith(assignedDriverId: assignedDriverId);
-      } catch (error) {
-        debugPrint('Student driver linking skipped: $error');
-        return profile;
-      }
-    }
-
-    if (profile.role == UserRole.driver && profile.routeId != null) {
-      try {
-        final routeRef = FirebaseFirestore.instance
-            .collection('routes')
-            .doc(profile.routeId);
-        final routeDoc = await routeRef.get();
-
-        if (!routeDoc.exists) {
-          await routeRef.set({
-            'name': AppDefaults.defaultRouteName,
-            'description': AppDefaults.defaultRouteDescription,
-            'driverId': profile.id,
-          });
-        } else {
-          await routeRef.set({'driverId': profile.id}, SetOptions(merge: true));
-        }
-      } catch (error) {
-        debugPrint('Driver route linking skipped: $error');
-      }
-    }
-
-    return profile;
   }
 
   void logout() {

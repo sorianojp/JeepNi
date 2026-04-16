@@ -8,7 +8,9 @@ import 'package:latlong2/latlong.dart';
 
 class FirebaseTrackingService extends ChangeNotifier {
   final Map<String, LatLng> _userLocations = <String, LatLng>{};
+  final Map<String, String> _userNames = <String, String>{};
   final Set<String> _driverIds = <String>{};
+  final Set<String> _studentIds = <String>{};
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _usersSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subscription;
@@ -29,17 +31,36 @@ class FirebaseTrackingService extends ChangeNotifier {
         .listen(
           (snapshot) {
             final nextDriverIds = <String>{};
+            final nextStudentIds = <String>{};
+            final nextUserNames = <String, String>{};
 
             for (final doc in snapshot.docs) {
               final data = doc.data();
-              if (data['role']?.toString().toLowerCase() == 'driver') {
+              final role = data['role']?.toString().toLowerCase();
+              final name = data['name']?.toString().trim();
+              final email = data['email']?.toString().trim();
+              nextUserNames[doc.id] = name?.isNotEmpty == true
+                  ? name!
+                  : email?.isNotEmpty == true
+                  ? email!
+                  : doc.id;
+
+              if (role == 'driver') {
                 nextDriverIds.add(doc.id);
+              } else if (role == 'student') {
+                nextStudentIds.add(doc.id);
               }
             }
 
             _driverIds
               ..clear()
               ..addAll(nextDriverIds);
+            _studentIds
+              ..clear()
+              ..addAll(nextStudentIds);
+            _userNames
+              ..clear()
+              ..addAll(nextUserNames);
             notifyListeners();
           },
           onError: (Object error) {
@@ -86,6 +107,8 @@ class FirebaseTrackingService extends ChangeNotifier {
     _positionSubscription = null;
     _isStartingLocationStream = false;
     _driverIds.clear();
+    _studentIds.clear();
+    _userNames.clear();
     _userLocations.clear();
   }
 
@@ -188,6 +211,16 @@ class FirebaseTrackingService extends ChangeNotifier {
   bool isDriver(String userId) {
     _ensureListening();
     return _driverIds.contains(userId);
+  }
+
+  bool isStudent(String userId) {
+    _ensureListening();
+    return _studentIds.contains(userId);
+  }
+
+  String displayNameFor(String userId) {
+    _ensureListening();
+    return _userNames[userId] ?? userId;
   }
 
   Future<void> updateLocation(String userId, LatLng newLocation) async {

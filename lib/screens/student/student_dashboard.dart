@@ -14,15 +14,20 @@ class StudentDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     final authService = Provider.of<FirebaseAuthService>(context);
     final trackingService = Provider.of<FirebaseTrackingService>(context);
-    
+
     final user = authService.currentUser;
-    if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (user == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     trackingService.startSharingLocation(user.id);
 
-    final driverId = user.assignedDriverId;
-    final driverLocation = driverId != null ? trackingService.getLocation(driverId) : null;
-    final myLocation = trackingService.getLocation(user.id) ??
+    final allLocations = trackingService.getAllLocations();
+    final driverLocations = allLocations.entries
+        .where((entry) => trackingService.isDriver(entry.key))
+        .toList();
+    final myLocation =
+        trackingService.getLocation(user.id) ??
         user.location ??
         const LatLng(14.5995, 120.9842);
 
@@ -36,7 +41,7 @@ class StudentDashboard extends StatelessWidget {
               authService.logout();
               context.go('/login');
             },
-          )
+          ),
         ],
       ),
       body: Column(
@@ -48,17 +53,20 @@ class StudentDashboard extends StatelessWidget {
               children: [
                 const Icon(Icons.person),
                 const SizedBox(width: 8),
-                Text('Welcome, ${user.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(
+                  'Welcome, ${user.name}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ),
           Expanded(
             child: FlutterMap(
               key: ValueKey('${myLocation.latitude},${myLocation.longitude}'),
-              options: MapOptions(
-                initialCenter: driverLocation ?? myLocation,
-                initialZoom: 15.0,
-              ),
+              options: MapOptions(initialCenter: myLocation, initialZoom: 15.0),
               children: [
                 ColoredBox(color: Colors.grey.shade200),
                 const AppMapTileLayer(),
@@ -69,16 +77,25 @@ class StudentDashboard extends StatelessWidget {
                       point: myLocation,
                       width: 80,
                       height: 80,
-                      child: const Icon(Icons.person_pin_circle, color: Colors.blue, size: 40),
+                      child: const Icon(
+                        Icons.person_pin_circle,
+                        color: Colors.blue,
+                        size: 40,
+                      ),
                     ),
-                    // Driver location marker
-                    if (driverLocation != null)
-                      Marker(
-                        point: driverLocation,
+                    // Driver location markers
+                    ...driverLocations.map(
+                      (driver) => Marker(
+                        point: driver.value,
                         width: 80,
                         height: 80,
-                        child: const Icon(Icons.directions_bus, color: Colors.green, size: 40),
+                        child: const Icon(
+                          Icons.directions_bus,
+                          color: Colors.green,
+                          size: 40,
+                        ),
                       ),
+                    ),
                   ],
                 ),
                 const SimpleAttributionWidget(
