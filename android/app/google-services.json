@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "978580525395",
+    "project_id": "jeepni-45b6c",
+    "storage_bucket": "jeepni-45b6c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:978580525395:android:a4f9f0c6914c49da0591a6",
+        "android_client_info": {
+          "package_name": "com.arzatech.jeepni"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIY2IGEr-chFfuFdK7CCwLRavcCj8OcJA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

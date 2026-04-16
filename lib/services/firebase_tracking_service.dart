@@ -1,0 +1,209 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
+
+class FirebaseTrackingService extends ChangeNotifier {
+  final Map<String, LatLng> _userLocations = <String, LatLng>{};
+  final Set<String> _driverIds = <String>{};
+
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _usersSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subscription;
+  StreamSubscription<Position>? _positionSubscription;
+  bool _isStartingLocationStream = false;
+  String? _locationError;
+
+  String? get locationError => _locationError;
+
+  void _ensureListening() {
+    if (fb.FirebaseAuth.instance.currentUser == null) {
+      return;
+    }
+
+    _usersSubscription ??= FirebaseFirestore.instance
+        .collection('users')
+        .snapshots()
+        .listen(
+          (snapshot) {
+            final nextDriverIds = <String>{};
+
+            for (final doc in snapshot.docs) {
+              final data = doc.data();
+              if (data['role']?.toString().toLowerCase() == 'driver') {
+                nextDriverIds.add(doc.id);
+              }
+            }
+
+            _driverIds
+              ..clear()
+              ..addAll(nextDriverIds);
+            notifyListeners();
+          },
+          onError: (Object error) {
+            debugPrint('Driver listener skipped: $error');
+          },
+        );
+
+    _subscription ??= FirebaseFirestore.instance
+        .collection('locations')
+        .snapshots()
+        .listen(
+          (snapshot) {
+            final nextLocations = <String, LatLng>{};
+
+            for (final doc in snapshot.docs) {
+              final data = doc.data();
+              final latitude = data['latitude'];
+              final longitude = data['longitude'];
+              if (latitude is num && longitude is num) {
+                nextLocations[doc.id] = LatLng(
+                  latitude.toDouble(),
+                  longitude.toDouble(),
+                );
+              }
+            }
+
+            _userLocations
+              ..clear()
+              ..addAll(nextLocations);
+            notifyListeners();
+          },
+          onError: (Object error) {
+            debugPrint('Location listener skipped: $error');
+          },
+        );
+  }
+
+  void _stopListening() {
+    _usersSubscription?.cancel();
+    _usersSubscription = null;
+    _subscription?.cancel();
+    _subscription = null;
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
+    _isStartingLocationStream = false;
+    _driverIds.clear();
+    _userLocations.clear();
+  }
+
+  Future<void> startSharingLocation(String userId) async {
+    _ensureListening();
+
+    final currentUser = fb.FirebaseAuth.instance.currentUser;
+    if (currentUser == null ||
+        currentUser.uid != userId ||
+        _positionSubscription != null ||
+        _isStartingLocationStream) {
+      return;
+    }
+
+    _isStartingLocationStream = true;
+    final hasPermission = await _ensureLocationPermission();
+    if (!hasPermission) {
+      _isStartingLocationStream = false;
+      notifyListeners();
+      return;
+    }
+
+    final lastKnown = await Geolocator.getLastKnownPosition();
+    if (lastKnown != null) {
+      await _writePosition(userId, lastKnown);
+    }
+
+    _positionSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.bestForNavigation,
+            distanceFilter: 3,
+          ),
+        ).listen(
+          (position) => _writePosition(userId, position),
+          onError: (Object error) {
+            _locationError = error.toString();
+            debugPrint('Location stream failed: $error');
+            notifyListeners();
+          },
+        );
+    _isStartingLocationStream = false;
+  }
+
+  Future<bool> _ensureLocationPermission() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _locationError = 'Turn on Location Services to show your exact position.';
+      return false;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied) {
+      _locationError = 'Location permission is required for accurate tracking.';
+      return false;
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _locationError =
+          'Enable location permission for JeepNi in system settings.';
+      return false;
+    }
+
+    final accuracy = await Geolocator.getLocationAccuracy();
+    if (accuracy == LocationAccuracyStatus.reduced) {
+      _locationError = 'Enable Precise Location for better accuracy.';
+    } else {
+      _locationError = null;
+    }
+
+    return true;
+  }
+
+  Future<void> _writePosition(String userId, Position position) async {
+    final nextLocation = LatLng(position.latitude, position.longitude);
+    _userLocations[userId] = nextLocation;
+    await FirebaseFirestore.instance.collection('locations').doc(userId).set({
+      'latitude': position.latitude,
+      'longitude': position.longitude,
+      'accuracyMeters': position.accuracy,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    notifyListeners();
+  }
+
+  LatLng? getLocation(String userId) {
+    _ensureListening();
+    return _userLocations[userId];
+  }
+
+  Map<String, LatLng> getAllLocations() {
+    _ensureListening();
+    return Map.unmodifiable(_userLocations);
+  }
+
+  bool isDriver(String userId) {
+    _ensureListening();
+    return _driverIds.contains(userId);
+  }
+
+  Future<void> updateLocation(String userId, LatLng newLocation) async {
+    _ensureListening();
+    _userLocations[userId] = newLocation;
+    await FirebaseFirestore.instance.collection('locations').doc(userId).set({
+      'latitude': newLocation.latitude,
+      'longitude': newLocation.longitude,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _stopListening();
+    super.dispose();
+  }
+}
