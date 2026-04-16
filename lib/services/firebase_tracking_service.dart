@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 class FirebaseTrackingService extends ChangeNotifier {
   final Map<String, LatLng> _userLocations = <String, LatLng>{};
   final Map<String, String> _userNames = <String, String>{};
+  final Map<String, double> _userSpeedsKmh = <String, double>{};
   final Set<String> _driverIds = <String>{};
   final Set<String> _studentIds = <String>{};
 
@@ -91,6 +92,7 @@ class FirebaseTrackingService extends ChangeNotifier {
         .listen(
           (snapshot) {
             final nextLocations = <String, LatLng>{};
+            final nextSpeedsKmh = <String, double>{};
 
             for (final doc in snapshot.docs) {
               final data = doc.data();
@@ -101,12 +103,19 @@ class FirebaseTrackingService extends ChangeNotifier {
                   latitude.toDouble(),
                   longitude.toDouble(),
                 );
+                final speedKmh = data['speedKmh'];
+                if (speedKmh is num) {
+                  nextSpeedsKmh[doc.id] = speedKmh.toDouble();
+                }
               }
             }
 
             _userLocations
               ..clear()
               ..addAll(nextLocations);
+            _userSpeedsKmh
+              ..clear()
+              ..addAll(nextSpeedsKmh);
             notifyListeners();
           },
           onError: (Object error) {
@@ -127,6 +136,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     _driverIds.clear();
     _studentIds.clear();
     _userNames.clear();
+    _userSpeedsKmh.clear();
     _userLocations.clear();
   }
 
@@ -237,11 +247,14 @@ class FirebaseTrackingService extends ChangeNotifier {
 
   Future<void> _writePosition(String userId, Position position) async {
     final nextLocation = LatLng(position.latitude, position.longitude);
+    final speedKmh = position.speed <= 0 ? 0.0 : position.speed * 3.6;
     _userLocations[userId] = nextLocation;
+    _userSpeedsKmh[userId] = speedKmh;
     await FirebaseFirestore.instance.collection('locations').doc(userId).set({
       'latitude': position.latitude,
       'longitude': position.longitude,
       'accuracyMeters': position.accuracy,
+      'speedKmh': speedKmh,
       'updatedAt': FieldValue.serverTimestamp(),
     });
     notifyListeners();
@@ -275,6 +288,11 @@ class FirebaseTrackingService extends ChangeNotifier {
   String displayNameFor(String userId) {
     _ensureListening();
     return _userNames[userId] ?? userId;
+  }
+
+  double? getSpeedKmh(String userId) {
+    _ensureListening();
+    return _userSpeedsKmh[userId];
   }
 
   Future<void> updateLocation(String userId, LatLng newLocation) async {

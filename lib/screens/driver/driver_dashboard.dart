@@ -28,6 +28,11 @@ class DriverDashboard extends StatelessWidget {
 
   static const double _studentClusterRadiusMeters = 30;
 
+  String _speedLabel(double? speedKmh) {
+    if (speedKmh == null) return '-- km/h';
+    return '${speedKmh.round()} km/h';
+  }
+
   List<_StudentCluster> _clusterStudents(Iterable<LatLng> points) {
     final clusters = <_StudentCluster>[];
 
@@ -73,6 +78,7 @@ class DriverDashboard extends StatelessWidget {
     trackingService.startSharingLocation(user.id);
 
     final myLocation = trackingService.getLocation(user.id);
+    final speedKmh = trackingService.getSpeedKmh(user.id);
     final allLocations = trackingService.getAllLocations();
 
     final studentsLocations = allLocations.entries
@@ -108,11 +114,38 @@ class DriverDashboard extends StatelessWidget {
               children: [
                 const Icon(Icons.directions_bus),
                 const SizedBox(width: 8),
-                Text(
-                  'Welcome, Driver ${user.name}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    'Welcome, Driver ${user.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.speed, size: 18, color: Colors.green),
+                      const SizedBox(width: 4),
+                      Text(
+                        _speedLabel(speedKmh),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -156,9 +189,6 @@ class DriverDashboard extends StatelessWidget {
                             ),
                           ),
                         ],
-                      ),
-                      const SimpleAttributionWidget(
-                        source: Text('OpenStreetMap, CARTO'),
                       ),
                     ],
                   ),

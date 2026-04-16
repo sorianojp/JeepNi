@@ -8,8 +8,17 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import '../../widgets/app_map_tile_layer.dart';
 
-class StudentDashboard extends StatelessWidget {
+class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
+
+  @override
+  State<StudentDashboard> createState() => _StudentDashboardState();
+}
+
+class _StudentDashboardState extends State<StudentDashboard> {
+  static const double _driverListHeight = 230;
+
+  final MapController _mapController = MapController();
 
   String _distanceLabel(LatLng? from, LatLng? to) {
     if (from == null) return 'Start sharing to calculate distance';
@@ -27,6 +36,16 @@ class StudentDashboard extends StatelessWidget {
     }
 
     return '${(meters / 1000).toStringAsFixed(1)} km away';
+  }
+
+  String _speedLabel(double? speedKmh) {
+    if (speedKmh == null) return 'Speed unavailable';
+    return '${speedKmh.round()} km/h';
+  }
+
+  void _focusDriver(LatLng? driverLocation) {
+    if (driverLocation == null) return;
+    _mapController.move(driverLocation, 16.0);
   }
 
   @override
@@ -123,6 +142,7 @@ class StudentDashboard extends StatelessWidget {
                     key: ValueKey(
                       '${mapCenter.latitude},${mapCenter.longitude}',
                     ),
+                    mapController: _mapController,
                     options: MapOptions(
                       initialCenter: mapCenter,
                       initialZoom: 15.0,
@@ -181,9 +201,6 @@ class StudentDashboard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SimpleAttributionWidget(
-                        source: Text('OpenStreetMap, CARTO'),
-                      ),
                     ],
                   ),
           ),
@@ -197,7 +214,7 @@ class StudentDashboard extends StatelessWidget {
               ),
             ),
           SizedBox(
-            height: 190,
+            height: _driverListHeight,
             child: Card(
               margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               elevation: 0,
@@ -231,10 +248,16 @@ class StudentDashboard extends StatelessWidget {
                                 final driverId = driverIds[index];
                                 final driverLocation = trackingService
                                     .getLocation(driverId);
+                                final driverSpeedKmh = trackingService
+                                    .getSpeedKmh(driverId);
 
                                 return ListTile(
                                   dense: true,
                                   contentPadding: EdgeInsets.zero,
+                                  enabled: driverLocation != null,
+                                  onTap: driverLocation == null
+                                      ? null
+                                      : () => _focusDriver(driverLocation),
                                   leading: const Icon(
                                     Icons.directions_bus,
                                     color: Colors.green,
@@ -245,7 +268,7 @@ class StudentDashboard extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   subtitle: Text(
-                                    _distanceLabel(myLocation, driverLocation),
+                                    '${_distanceLabel(myLocation, driverLocation)} • ${_speedLabel(driverSpeedKmh)}',
                                   ),
                                 );
                               },

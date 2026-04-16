@@ -85,9 +85,6 @@ class AdminMapScreen extends StatelessWidget {
                   );
                 }).toList(),
               ),
-              const SimpleAttributionWidget(
-                source: Text('OpenStreetMap, CARTO'),
-              ),
             ],
           ),
           Positioned(
