@@ -1,13 +1,64 @@
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_tracking_service.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 import '../../widgets/app_map_tile_layer.dart';
+
+class _StudentCluster {
+  _StudentCluster(this.center, this.count);
+
+  LatLng center;
+  int count;
+
+  void add(LatLng point) {
+    center = LatLng(
+      ((center.latitude * count) + point.latitude) / (count + 1),
+      ((center.longitude * count) + point.longitude) / (count + 1),
+    );
+    count += 1;
+  }
+}
 
 class DriverDashboard extends StatelessWidget {
   const DriverDashboard({super.key});
+
+  static const double _studentClusterRadiusMeters = 30;
+
+  List<_StudentCluster> _clusterStudents(Iterable<LatLng> points) {
+    final clusters = <_StudentCluster>[];
+
+    for (final point in points) {
+      _StudentCluster? nearestCluster;
+      double? nearestDistance;
+
+      for (final cluster in clusters) {
+        final distance = Geolocator.distanceBetween(
+          point.latitude,
+          point.longitude,
+          cluster.center.latitude,
+          cluster.center.longitude,
+        );
+
+        if (distance <= _studentClusterRadiusMeters &&
+            (nearestDistance == null || distance < nearestDistance)) {
+          nearestCluster = cluster;
+          nearestDistance = distance;
+        }
+      }
+
+      if (nearestCluster == null) {
+        clusters.add(_StudentCluster(point, 1));
+      } else {
+        nearestCluster.add(point);
+      }
+    }
+
+    return clusters;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +78,9 @@ class DriverDashboard extends StatelessWidget {
     final studentsLocations = allLocations.entries
         .where((entry) => trackingService.isStudent(entry.key))
         .toList();
+    final studentClusters = _clusterStudents(
+      studentsLocations.map((student) => student.value),
+    );
     final mapCenter =
         myLocation ??
         (studentsLocations.isEmpty ? null : studentsLocations.first.value);
@@ -91,15 +145,13 @@ class DriverDashboard extends StatelessWidget {
                                 size: 40,
                               ),
                             ),
-                          ...studentsLocations.map(
-                            (student) => Marker(
-                              point: student.value,
+                          ...studentClusters.map(
+                            (cluster) => Marker(
+                              point: cluster.center,
                               width: 80,
                               height: 80,
-                              child: const Icon(
-                                Icons.person_pin_circle,
-                                color: Colors.blue,
-                                size: 30,
+                              child: _StudentClusterMarker(
+                                count: cluster.count,
                               ),
                             ),
                           ),
@@ -122,6 +174,48 @@ class DriverDashboard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _StudentClusterMarker extends StatelessWidget {
+  const _StudentClusterMarker({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    if (count == 1) {
+      return const Icon(Icons.person_pin_circle, color: Colors.blue, size: 30);
+    }
+
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        const Icon(Icons.person_pin_circle, color: Colors.blue, size: 42),
+        Positioned(
+          top: -10,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.blue, width: 2),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Text(
+                count.toString(),
+                style: const TextStyle(
+                  color: Colors.blue,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
