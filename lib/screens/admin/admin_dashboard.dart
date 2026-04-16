@@ -1,89 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../services/firebase_auth_service.dart';
-import '../../services/firebase_tracking_service.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
-import '../../widgets/app_map_tile_layer.dart';
+import 'package:provider/provider.dart';
 
-class AdminDashboard extends StatefulWidget {
+import '../../services/firebase_auth_service.dart';
+
+class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
-
-  @override
-  State<AdminDashboard> createState() => _AdminDashboardState();
-}
-
-class _AdminDashboardState extends State<AdminDashboard> {
-  final TextEditingController _driverNameController = TextEditingController();
-  final TextEditingController _driverEmailController = TextEditingController();
-  final TextEditingController _driverPasswordController =
-      TextEditingController();
-  bool _isCreatingDriver = false;
-  String? _driverFormMessage;
-
-  @override
-  void dispose() {
-    _driverNameController.dispose();
-    _driverEmailController.dispose();
-    _driverPasswordController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _createDriver(FirebaseAuthService authService) async {
-    final name = _driverNameController.text.trim();
-    final email = _driverEmailController.text.trim();
-    final password = _driverPasswordController.text;
-
-    if (name.isEmpty || email.isEmpty || password.isEmpty) {
-      setState(() {
-        _driverFormMessage = 'Driver name, email, and password are required.';
-      });
-      return;
-    }
-
-    setState(() {
-      _isCreatingDriver = true;
-      _driverFormMessage = null;
-    });
-
-    final success = await authService.createDriverAccount(
-      email: email,
-      password: password,
-      name: name,
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _isCreatingDriver = false;
-      _driverFormMessage = success
-          ? 'Driver account created.'
-          : authService.lastError ?? 'Could not create driver account.';
-    });
-
-    if (success) {
-      _driverNameController.clear();
-      _driverEmailController.clear();
-      _driverPasswordController.clear();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<FirebaseAuthService>(context);
-    final trackingService = Provider.of<FirebaseTrackingService>(context);
-
-    final user = authService.currentUser;
-    if (user != null) {
-      trackingService.startSharingLocation(user.id);
-    }
-
-    final allLocations = trackingService.getAllLocations();
-    final myLocation = user == null
-        ? null
-        : trackingService.getLocation(user.id);
-    final mapCenter =
-        myLocation ?? (allLocations.isEmpty ? null : allLocations.values.first);
 
     return Scaffold(
       appBar: AppBar(
@@ -99,166 +25,111 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.purple.shade50,
-            child: const Row(
-              children: [
-                Icon(Icons.admin_panel_settings),
-                SizedBox(width: 8),
-                Text(
-                  'System Overview',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.purple.shade50,
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.purple.shade100),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Create Driver Account',
+              child: const Row(
+                children: [
+                  Icon(Icons.admin_panel_settings),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Admin tools',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _driverNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Driver full name',
-                        border: OutlineInputBorder(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _AdminActionCard(
+              icon: Icons.map,
+              title: 'Live Map',
+              subtitle: 'View live student and driver locations.',
+              onTap: () => context.go('/admin/map'),
+            ),
+            const SizedBox(height: 12),
+            _AdminActionCard(
+              icon: Icons.person_add,
+              title: 'Create Driver',
+              subtitle: 'Create a driver login account.',
+              onTap: () => context.go('/admin/drivers'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminActionCard extends StatelessWidget {
+  const _AdminActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.purple.shade100),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Colors.purple.shade50,
+                foregroundColor: Colors.purple,
+                child: Icon(icon),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _driverEmailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Driver email',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _driverPasswordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Temporary password',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (_driverFormMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          _driverFormMessage!,
-                          style: TextStyle(
-                            color:
-                                _driverFormMessage == 'Driver account created.'
-                                ? Colors.green
-                                : Colors.red,
-                          ),
-                        ),
-                      ),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _isCreatingDriver
-                            ? null
-                            : () => _createDriver(authService),
-                        icon: _isCreatingDriver
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.person_add),
-                        label: Text(
-                          _isCreatingDriver ? 'Creating...' : 'Create driver',
-                        ),
-                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: Colors.grey.shade700),
                     ),
                   ],
                 ),
               ),
-            ),
+              const Icon(Icons.chevron_right),
+            ],
           ),
-          Expanded(
-            child: mapCenter == null
-                ? const Center(child: Text('Waiting for live locations...'))
-                : FlutterMap(
-                    key: ValueKey(
-                      '${mapCenter.latitude},${mapCenter.longitude}',
-                    ),
-                    options: MapOptions(
-                      initialCenter: mapCenter,
-                      initialZoom: 13.5,
-                    ),
-                    children: [
-                      ColoredBox(color: Colors.grey.shade200),
-                      const AppMapTileLayer(),
-                      MarkerLayer(
-                        markers: allLocations.entries.map((entry) {
-                          final isDriver = trackingService.isDriver(entry.key);
-                          final displayName = trackingService.displayNameFor(
-                            entry.key,
-                          );
-                          return Marker(
-                            point: entry.value,
-                            width: 80,
-                            height: 80,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isDriver
-                                      ? Icons.directions_bus
-                                      : Icons.person_pin_circle,
-                                  color: isDriver ? Colors.green : Colors.blue,
-                                  size: isDriver ? 40 : 30,
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.all(2),
-                                  color: Colors.white70,
-                                  child: Text(
-                                    displayName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SimpleAttributionWidget(
-                        source: Text('OpenStreetMap, CARTO'),
-                      ),
-                    ],
-                  ),
-          ),
-        ],
+        ),
       ),
     );
   }

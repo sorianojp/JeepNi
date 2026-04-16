@@ -3,6 +3,8 @@ import '../screens/auth/login_screen.dart';
 import '../screens/student/student_dashboard.dart';
 import '../screens/driver/driver_dashboard.dart';
 import '../screens/admin/admin_dashboard.dart';
+import '../screens/admin/admin_create_driver_screen.dart';
+import '../screens/admin/admin_map_screen.dart';
 import '../services/firebase_auth_service.dart';
 import '../models/user_model.dart';
 import 'package:provider/provider.dart';
@@ -10,13 +12,16 @@ import 'package:provider/provider.dart';
 final router = GoRouter(
   initialLocation: '/login',
   redirect: (context, state) {
-    final authService = Provider.of<FirebaseAuthService>(context, listen: false);
+    final authService = Provider.of<FirebaseAuthService>(
+      context,
+      listen: false,
+    );
     final isAuthenticated = authService.currentUser != null;
-    
+
     if (!isAuthenticated && state.matchedLocation != '/login') {
       return '/login';
     }
-    
+
     if (isAuthenticated && state.matchedLocation == '/login') {
       final role = authService.currentUser!.role;
       switch (role) {
@@ -28,14 +33,11 @@ final router = GoRouter(
           return '/admin';
       }
     }
-    
+
     return null;
   },
   routes: [
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => const LoginScreen(),
-    ),
+    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
     GoRoute(
       path: '/student',
       builder: (context, state) => const StudentDashboard(),
@@ -47,6 +49,14 @@ final router = GoRouter(
     GoRoute(
       path: '/admin',
       builder: (context, state) => const AdminDashboard(),
+    ),
+    GoRoute(
+      path: '/admin/map',
+      builder: (context, state) => const AdminMapScreen(),
+    ),
+    GoRoute(
+      path: '/admin/drivers',
+      builder: (context, state) => const AdminCreateDriverScreen(),
     ),
   ],
 );
