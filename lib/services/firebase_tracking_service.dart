@@ -7,8 +7,11 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 class FirebaseTrackingService extends ChangeNotifier {
-  static const Duration _heartbeatInterval = Duration(seconds: 30);
+  static const Duration _heartbeatInterval = Duration(seconds: 15);
+  static const Duration _liveUpdateInterval = Duration(seconds: 2);
+  static const Duration _currentLocationTimeout = Duration(seconds: 12);
   static const Duration _staleLocationTimeout = Duration(minutes: 3);
+  static const int _liveDistanceFilterMeters = 1;
 
   final Map<String, LatLng> _userLocations = <String, LatLng>{};
   final Map<String, String> _userNames = <String, String>{};
@@ -25,6 +28,7 @@ class FirebaseTrackingService extends ChangeNotifier {
   Position? _lastPosition;
   String? _sharingUserId;
   bool _isStartingLocationStream = false;
+  bool _isRefreshingCurrentPosition = false;
   String? _locationError;
 
   String? get locationError => _locationError;
@@ -153,6 +157,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     _lastPosition = null;
     _sharingUserId = null;
     _isStartingLocationStream = false;
+    _isRefreshingCurrentPosition = false;
     _driverIds.clear();
     _studentIds.clear();
     _userNames.clear();
@@ -193,9 +198,7 @@ class FirebaseTrackingService extends ChangeNotifier {
 
     try {
       final currentPosition = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-        ),
+        locationSettings: _currentLocationSettings(),
       );
       await _writePosition(userId, currentPosition);
     } catch (error) {
@@ -208,10 +211,7 @@ class FirebaseTrackingService extends ChangeNotifier {
 
     _positionSubscription =
         Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.bestForNavigation,
-            distanceFilter: 3,
-          ),
+          locationSettings: _streamLocationSettings(),
         ).listen(
           (position) => _writePosition(userId, position),
           onError: (Object error) {
@@ -223,11 +223,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     _sharingUserId = userId;
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
-      final lastPosition = _lastPosition;
-      final sharingUserId = _sharingUserId;
-      if (lastPosition != null && sharingUserId == userId) {
-        _writePosition(sharingUserId!, lastPosition);
-      }
+      _refreshCurrentPosition(userId);
     });
     _isStartingLocationStream = false;
     notifyListeners();
@@ -246,6 +242,7 @@ class FirebaseTrackingService extends ChangeNotifier {
       _heartbeatTimer = null;
       _lastPosition = null;
       _sharingUserId = null;
+      _isRefreshingCurrentPosition = false;
     }
 
     _userLocations.remove(userId);
@@ -289,6 +286,81 @@ class FirebaseTrackingService extends ChangeNotifier {
     }
 
     return true;
+  }
+
+  LocationSettings _currentLocationSettings() {
+    return _locationSettings(timeLimit: _currentLocationTimeout);
+  }
+
+  LocationSettings _streamLocationSettings() {
+    return _locationSettings(useForegroundService: true);
+  }
+
+  LocationSettings _locationSettings({
+    Duration? timeLimit,
+    bool useForegroundService = false,
+  }) {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return AndroidSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          distanceFilter: _liveDistanceFilterMeters,
+          intervalDuration: _liveUpdateInterval,
+          timeLimit: timeLimit,
+          foregroundNotificationConfig: useForegroundService
+              ? const ForegroundNotificationConfig(
+                  notificationTitle: 'JeepNi live location',
+                  notificationText: 'Sharing your location for live tracking.',
+                  notificationChannelName: 'Live location',
+                  enableWakeLock: true,
+                  setOngoing: true,
+                )
+              : null,
+        );
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return AppleSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          activityType: ActivityType.automotiveNavigation,
+          distanceFilter: _liveDistanceFilterMeters,
+          pauseLocationUpdatesAutomatically: false,
+          allowBackgroundLocationUpdates: false,
+          timeLimit: timeLimit,
+        );
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
+        return LocationSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          distanceFilter: _liveDistanceFilterMeters,
+          timeLimit: timeLimit,
+        );
+    }
+  }
+
+  Future<void> _refreshCurrentPosition(String userId) async {
+    if (_isRefreshingCurrentPosition || _sharingUserId != userId) {
+      return;
+    }
+
+    _isRefreshingCurrentPosition = true;
+    try {
+      final currentPosition = await Geolocator.getCurrentPosition(
+        locationSettings: _currentLocationSettings(),
+      );
+      if (_sharingUserId == userId) {
+        await _writePosition(userId, currentPosition);
+      }
+    } catch (error) {
+      final lastPosition = _lastPosition;
+      if (lastPosition != null && _sharingUserId == userId) {
+        await _writePosition(userId, lastPosition);
+      } else {
+        debugPrint('Location refresh failed: $error');
+      }
+    } finally {
+      _isRefreshingCurrentPosition = false;
+    }
   }
 
   Future<void> _writePosition(String userId, Position position) async {

@@ -19,6 +19,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
   static const double _driverListHeight = 230;
 
   final MapController _mapController = MapController();
+  bool _hasCenteredMap = false;
 
   String _distanceLabel(LatLng? from, LatLng? to) {
     if (from == null) return 'Start sharing to calculate distance';
@@ -69,6 +70,13 @@ class _StudentDashboardState extends State<StudentDashboard> {
     final mapCenter =
         myLocation ??
         (driverLocations.isEmpty ? null : driverLocations.first.value);
+    if (!_hasCenteredMap && mapCenter != null) {
+      _hasCenteredMap = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mapController.move(mapCenter, 15.0);
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -141,9 +149,6 @@ class _StudentDashboardState extends State<StudentDashboard> {
             child: mapCenter == null
                 ? const Center(child: Text('Waiting for live location...'))
                 : FlutterMap(
-                    key: ValueKey(
-                      '${mapCenter.latitude},${mapCenter.longitude}',
-                    ),
                     mapController: _mapController,
                     options: MapOptions(
                       initialCenter: mapCenter,

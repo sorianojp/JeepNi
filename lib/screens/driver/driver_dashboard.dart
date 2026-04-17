@@ -23,10 +23,18 @@ class _StudentCluster {
   }
 }
 
-class DriverDashboard extends StatelessWidget {
+class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
 
+  @override
+  State<DriverDashboard> createState() => _DriverDashboardState();
+}
+
+class _DriverDashboardState extends State<DriverDashboard> {
   static const double _studentClusterRadiusMeters = 30;
+
+  final MapController _mapController = MapController();
+  bool _hasCenteredMap = false;
 
   String _speedLabel(double? speedKmh) {
     if (speedKmh == null) return '-- km/h';
@@ -90,6 +98,13 @@ class DriverDashboard extends StatelessWidget {
     final mapCenter =
         myLocation ??
         (studentsLocations.isEmpty ? null : studentsLocations.first.value);
+    if (!_hasCenteredMap && mapCenter != null) {
+      _hasCenteredMap = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mapController.move(mapCenter, 14.0);
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -157,9 +172,7 @@ class DriverDashboard extends StatelessWidget {
             child: mapCenter == null
                 ? const Center(child: Text('Waiting for live location...'))
                 : FlutterMap(
-                    key: ValueKey(
-                      '${mapCenter.latitude},${mapCenter.longitude}',
-                    ),
+                    mapController: _mapController,
                     options: MapOptions(
                       initialCenter: mapCenter,
                       initialZoom: 14.0,
