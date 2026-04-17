@@ -9,6 +9,8 @@ import 'package:latlong2/latlong.dart';
 import '../../core/map_camera_animator.dart';
 import '../../widgets/app_map_tile_layer.dart';
 
+const double _studentOverlayRadius = 18;
+
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
 
@@ -18,7 +20,6 @@ class StudentDashboard extends StatefulWidget {
 
 class _StudentDashboardState extends State<StudentDashboard>
     with TickerProviderStateMixin {
-  static const double _driverListHeight = 230;
   static const double _cameraMoveThresholdMeters = 2;
 
   final MapController _mapController = MapController();
@@ -151,227 +152,339 @@ class _StudentDashboardState extends State<StudentDashboard>
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.blue.shade50,
-            child: Row(
+      body: mapCenter == null
+          ? const Center(child: Text('Waiting for live location...'))
+          : Stack(
               children: [
-                const Icon(Icons.person),
-                const SizedBox(width: 8),
-                Text(
-                  'Welcome, ${user.name}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: mapCenter,
+                    initialZoom: 15.0,
                   ),
+                  children: [
+                    ColoredBox(color: Colors.grey.shade200),
+                    const AppMapTileLayer(),
+                    MarkerLayer(
+                      markers: [
+                        if (myLocation != null)
+                          Marker(
+                            point: myLocation,
+                            width: 80,
+                            height: 80,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.person_pin_circle,
+                                  color: Colors.blue,
+                                  size: 40,
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: const Text(
+                                    'Me',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ...driverLocations.map(
+                          (driver) => Marker(
+                            point: driver.value,
+                            width: 80,
+                            height: 80,
+                            child: Icon(
+                              Icons.directions_bus,
+                              color: driver.key == _followedDriverId
+                                  ? Colors.orange
+                                  : Colors.green,
+                              size: driver.key == _followedDriverId ? 46 : 40,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  top: 12,
+                  child: _StudentMapControls(
+                    studentName: user.name,
+                    isSharing: isSharing,
+                    isStarting: isStarting,
+                    onToggleSharing: () {
+                      if (isSharing) {
+                        trackingService.stopSharingLocation(user.id);
+                      } else {
+                        trackingService.startSharingLocation(user.id);
+                      }
+                    },
+                  ),
+                ),
+                if (_followedDriverId != null)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    top: 86,
+                    child: _FollowingDriverBanner(
+                      driverName: followedDriverName ?? 'Driver',
+                      hasLiveLocation: followedDriverLocation != null,
+                      onStop: _stopFollowingDriver,
+                    ),
+                  ),
+                if (trackingService.locationError != null)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    top: _followedDriverId == null ? 86 : 142,
+                    child: _MapErrorBanner(
+                      message: trackingService.locationError!,
+                    ),
+                  ),
+                _DriversBottomSheet(
+                  driverIds: driverIds,
+                  myLocation: myLocation,
+                  followedDriverId: _followedDriverId,
+                  trackingService: trackingService,
+                  distanceLabel: _distanceLabel,
+                  speedLabel: _speedLabel,
+                  onFollowDriver: _followDriver,
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _StudentMapControls extends StatelessWidget {
+  const _StudentMapControls({
+    required this.studentName,
+    required this.isSharing,
+    required this.isStarting,
+    required this.onToggleSharing,
+  });
+
+  final String studentName;
+  final bool isSharing;
+  final bool isStarting;
+  final VoidCallback onToggleSharing;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(_studentOverlayRadius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: isStarting
-                    ? null
-                    : () {
-                        if (isSharing) {
-                          trackingService.stopSharingLocation(user.id);
-                        } else {
-                          trackingService.startSharingLocation(user.id);
-                        }
-                      },
-                icon: isStarting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        isSharing ? Icons.location_disabled : Icons.my_location,
-                      ),
-                label: Text(
-                  isStarting
-                      ? 'Starting location sharing...'
-                      : isSharing
-                      ? 'Stop sharing location'
-                      : 'Start sharing location',
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.person, color: Colors.blue),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                studentName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: isStarting ? null : onToggleSharing,
+              icon: isStarting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      isSharing ? Icons.location_disabled : Icons.my_location,
+                      size: 18,
+                    ),
+              label: Text(isSharing ? 'Stop' : 'Share'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapErrorBanner extends StatelessWidget {
+  const _MapErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.red.shade50.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.red.shade100),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Text(
+          message,
+          style: TextStyle(color: Colors.red.shade800),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
+class _DriversBottomSheet extends StatelessWidget {
+  const _DriversBottomSheet({
+    required this.driverIds,
+    required this.myLocation,
+    required this.followedDriverId,
+    required this.trackingService,
+    required this.distanceLabel,
+    required this.speedLabel,
+    required this.onFollowDriver,
+  });
+
+  final List<String> driverIds;
+  final LatLng? myLocation;
+  final String? followedDriverId;
+  final FirebaseTrackingService trackingService;
+  final String Function(LatLng? from, LatLng? to) distanceLabel;
+  final String Function(double? speedKmh) speedLabel;
+  final void Function(String driverId, LatLng driverLocation) onFollowDriver;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.22,
+      minChildSize: 0.12,
+      maxChildSize: 0.48,
+      snap: true,
+      snapSizes: const [0.12, 0.22, 0.48],
+      builder: (context, scrollController) {
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 20,
+                offset: const Offset(0, -6),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
-            ),
-          ),
-          Expanded(
-            child: mapCenter == null
-                ? const Center(child: Text('Waiting for live location...'))
-                : Stack(
-                    children: [
-                      FlutterMap(
-                        mapController: _mapController,
-                        options: MapOptions(
-                          initialCenter: mapCenter,
-                          initialZoom: 15.0,
-                        ),
-                        children: [
-                          ColoredBox(color: Colors.grey.shade200),
-                          const AppMapTileLayer(),
-                          MarkerLayer(
-                            markers: [
-                              if (myLocation != null)
-                                Marker(
-                                  point: myLocation,
-                                  width: 80,
-                                  height: 80,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.person_pin_circle,
-                                        color: Colors.blue,
-                                        size: 40,
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.9,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            999,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'Me',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ...driverLocations.map(
-                                (driver) => Marker(
-                                  point: driver.value,
-                                  width: 80,
-                                  height: 80,
-                                  child: Icon(
-                                    Icons.directions_bus,
-                                    color: driver.key == _followedDriverId
-                                        ? Colors.orange
-                                        : Colors.green,
-                                    size: driver.key == _followedDriverId
-                                        ? 46
-                                        : 40,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      if (_followedDriverId != null)
-                        Positioned(
-                          left: 12,
-                          right: 12,
-                          top: 12,
-                          child: _FollowingDriverBanner(
-                            driverName: followedDriverName ?? 'Driver',
-                            hasLiveLocation: followedDriverLocation != null,
-                            onStop: _stopFollowingDriver,
-                          ),
-                        ),
-                    ],
-                  ),
-          ),
-          if (trackingService.locationError != null)
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                trackingService.locationError!,
-                style: const TextStyle(color: Colors.red),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          SizedBox(
-            height: _driverListHeight,
-            child: Card(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.blue.shade100),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                child: Row(
                   children: [
-                    const Text(
-                      'Drivers nearby',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                    const Expanded(
+                      child: Text(
+                        'Drivers nearby',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: driverIds.isEmpty
-                          ? const Center(
-                              child: Text('No drivers available yet.'),
-                            )
-                          : ListView.separated(
-                              itemCount: driverIds.length,
-                              separatorBuilder: (context, index) =>
-                                  const Divider(height: 1),
-                              itemBuilder: (context, index) {
-                                final driverId = driverIds[index];
-                                final driverLocation = trackingService
-                                    .getLocation(driverId);
-                                final driverSpeedKmh = trackingService
-                                    .getSpeedKmh(driverId);
-
-                                return ListTile(
-                                  dense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                  enabled: driverLocation != null,
-                                  onTap: driverLocation == null
-                                      ? null
-                                      : () => _followDriver(
-                                          driverId,
-                                          driverLocation,
-                                        ),
-                                  leading: Icon(
-                                    Icons.directions_bus,
-                                    color: driverId == _followedDriverId
-                                        ? Colors.orange
-                                        : Colors.green,
-                                  ),
-                                  title: Text(
-                                    trackingService.displayNameFor(driverId),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Text(
-                                    '${_distanceLabel(myLocation, driverLocation)} • ${_speedLabel(driverSpeedKmh)}',
-                                  ),
-                                );
-                              },
-                            ),
+                    Text(
+                      '${driverIds.length}',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
+              Expanded(
+                child: driverIds.isEmpty
+                    ? ListView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                        children: const [
+                          Center(child: Text('No drivers available yet.')),
+                        ],
+                      )
+                    : ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        itemCount: driverIds.length,
+                        separatorBuilder: (context, index) =>
+                            const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final driverId = driverIds[index];
+                          final driverLocation = trackingService.getLocation(
+                            driverId,
+                          );
+                          final driverSpeedKmh = trackingService.getSpeedKmh(
+                            driverId,
+                          );
+
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            enabled: driverLocation != null,
+                            onTap: driverLocation == null
+                                ? null
+                                : () =>
+                                      onFollowDriver(driverId, driverLocation),
+                            leading: Icon(
+                              Icons.directions_bus,
+                              color: driverId == followedDriverId
+                                  ? Colors.orange
+                                  : Colors.green,
+                            ),
+                            title: Text(
+                              trackingService.displayNameFor(driverId),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              '${distanceLabel(myLocation, driverLocation)} • ${speedLabel(driverSpeedKmh)}',
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -392,7 +505,7 @@ class _FollowingDriverBanner extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(_studentOverlayRadius),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.14),
