@@ -21,6 +21,7 @@ class StudentDashboard extends StatefulWidget {
 class _StudentDashboardState extends State<StudentDashboard>
     with TickerProviderStateMixin {
   static const double _cameraMoveThresholdMeters = 2;
+  static const double _offscreenIndicatorPadding = 18;
 
   final MapController _mapController = MapController();
   late final MapCameraAnimator _cameraAnimator;
@@ -161,6 +162,11 @@ class _StudentDashboardState extends State<StudentDashboard>
                   options: MapOptions(
                     initialCenter: mapCenter,
                     initialZoom: 15.0,
+                    onPositionChanged: (camera, hasGesture) {
+                      if (mounted) {
+                        setState(() {});
+                      }
+                    },
                   ),
                   children: [
                     ColoredBox(color: Colors.grey.shade200),
@@ -216,6 +222,13 @@ class _StudentDashboardState extends State<StudentDashboard>
                       ],
                     ),
                   ],
+                ),
+                _OffscreenDriverIndicators(
+                  drivers: driverLocations,
+                  followedDriverId: _followedDriverId,
+                  mapController: _mapController,
+                  padding: _offscreenIndicatorPadding,
+                  onTapDriver: _followDriver,
                 ),
                 Positioned(
                   left: 12,
@@ -302,6 +315,113 @@ class _DriverMapMarker extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _OffscreenDriverIndicators extends StatelessWidget {
+  const _OffscreenDriverIndicators({
+    required this.drivers,
+    required this.followedDriverId,
+    required this.mapController,
+    required this.padding,
+    required this.onTapDriver,
+  });
+
+  final List<MapEntry<String, LatLng>> drivers;
+  final String? followedDriverId;
+  final MapController mapController;
+  final double padding;
+  final void Function(String driverId, LatLng driverLocation) onTapDriver;
+
+  @override
+  Widget build(BuildContext context) {
+    if (drivers.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
+          return const SizedBox.shrink();
+        }
+
+        final camera = mapController.camera;
+        final bounds = camera.visibleBounds;
+        final width = constraints.maxWidth;
+        final height = constraints.maxHeight;
+        final indicators = <Widget>[];
+
+        for (final driver in drivers) {
+          if (bounds.contains(driver.value)) {
+            continue;
+          }
+
+          final screenOffset = camera.latLngToScreenOffset(driver.value);
+          final x = screenOffset.dx.clamp(padding, width - padding);
+          final y = screenOffset.dy.clamp(padding, height - padding);
+          final isFollowed = driver.key == followedDriverId;
+
+          indicators.add(
+            Positioned(
+              left: x - 22,
+              top: y - 22,
+              child: _OffscreenDriverIndicator(
+                isFollowed: isFollowed,
+                onTap: () => onTapDriver(driver.key, driver.value),
+              ),
+            ),
+          );
+        }
+
+        if (indicators.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Stack(children: indicators);
+      },
+    );
+  }
+}
+
+class _OffscreenDriverIndicator extends StatelessWidget {
+  const _OffscreenDriverIndicator({
+    required this.isFollowed,
+    required this.onTap,
+  });
+
+  final bool isFollowed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isFollowed ? Colors.orange : Colors.green;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.94),
+            shape: BoxShape.circle,
+            border: Border.all(color: color, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(Icons.directions_bus, color: color, size: 28),
+          ),
+        ),
+      ),
     );
   }
 }
