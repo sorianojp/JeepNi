@@ -450,7 +450,7 @@ class _DriversBottomSheet extends StatelessWidget {
                   children: [
                     const Expanded(
                       child: Text(
-                        'Drivers nearby',
+                        'Drivers Online',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
