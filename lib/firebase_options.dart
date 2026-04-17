@@ -1,10 +1,13 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      return web;
+      throw UnsupportedError(
+        'FirebaseOptions are not configured for web. Add a web app in Firebase first.',
+      );
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -14,62 +17,43 @@ class DefaultFirebaseOptions {
       case TargetPlatform.macOS:
         return macos;
       case TargetPlatform.windows:
-        return windows;
+        throw UnsupportedError(
+          'FirebaseOptions are not configured for Windows. Add a Windows app in Firebase first.',
+        );
       case TargetPlatform.linux:
-        return linux;
+        throw UnsupportedError(
+          'FirebaseOptions are not configured for Linux. Add a Linux app in Firebase first.',
+        );
       case TargetPlatform.fuchsia:
-        throw UnsupportedError('DefaultFirebaseOptions are not supported for this platform.');
+        throw UnsupportedError(
+          'DefaultFirebaseOptions are not supported for this platform.',
+        );
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBT8psFxrMV6_RaOK5qeJ0HZ5Fl38-6IUc',
-    appId: '1:134297565560:web:jeppniwebapp',
-    messagingSenderId: '134297565560',
-    projectId: 'jeppni',
-    authDomain: 'jeppni.firebaseapp.com',
-    storageBucket: 'jeppni.firebasestorage.app',
-  );
-
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBT8psFxrMV6_RaOK5qeJ0HZ5Fl38-6IUc',
-    appId: '1:134297565560:android:8f621839c9170a3b3cb08d',
-    messagingSenderId: '134297565560',
-    projectId: 'jeppni',
-    storageBucket: 'jeppni.firebasestorage.app',
+    apiKey: 'AIzaSyBIY2IGEr-chFfuFdK7CCwLRavcCj8OcJA',
+    appId: '1:978580525395:android:a4f9f0c6914c49da0591a6',
+    messagingSenderId: '978580525395',
+    projectId: 'jeepni-45b6c',
+    storageBucket: 'jeepni-45b6c.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBDYHtceRE4T4rHaTwni_hQ6JrU1FxzVWU',
-    appId: '1:134297565560:ios:147bfeaaddd409803cb08d',
-    messagingSenderId: '134297565560',
-    projectId: 'jeppni',
-    storageBucket: 'jeppni.firebasestorage.app',
+    apiKey: 'AIzaSyArA_ADqGErmk2LH4uf1eB2ON1S7sqNkmk',
+    appId: '1:978580525395:ios:cae594743fc5e8270591a6',
+    messagingSenderId: '978580525395',
+    projectId: 'jeepni-45b6c',
+    storageBucket: 'jeepni-45b6c.firebasestorage.app',
     iosBundleId: 'com.arzatech.jeepni',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBDYHtceRE4T4rHaTwni_hQ6JrU1FxzVWU',
-    appId: '1:134297565560:ios:147bfeaaddd409803cb08d',
-    messagingSenderId: '134297565560',
-    projectId: 'jeppni',
-    storageBucket: 'jeppni.firebasestorage.app',
+    apiKey: 'AIzaSyArA_ADqGErmk2LH4uf1eB2ON1S7sqNkmk',
+    appId: '1:978580525395:ios:cae594743fc5e8270591a6',
+    messagingSenderId: '978580525395',
+    projectId: 'jeepni-45b6c',
+    storageBucket: 'jeepni-45b6c.firebasestorage.app',
     iosBundleId: 'com.arzatech.jeepni',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBT8psFxrMV6_RaOK5qeJ0HZ5Fl38-6IUc',
-    appId: '1:134297565560:web:jeppniwindowsapp',
-    messagingSenderId: '134297565560',
-    projectId: 'jeppni',
-    storageBucket: 'jeppni.firebasestorage.app',
-  );
-
-  static const FirebaseOptions linux = FirebaseOptions(
-    apiKey: 'AIzaSyBT8psFxrMV6_RaOK5qeJ0HZ5Fl38-6IUc',
-    appId: '1:134297565560:web:jeppnilinuxapp',
-    messagingSenderId: '134297565560',
-    projectId: 'jeppni',
-    storageBucket: 'jeppni.firebasestorage.app',
   );
 }

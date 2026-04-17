@@ -20,6 +20,22 @@ class FirebaseAuthService extends ChangeNotifier {
     _restoreCurrentUser();
   }
 
+  void _debugAuthError(String action, Object error, StackTrace stackTrace) {
+    debugPrint('FirebaseAuthService.$action failed');
+    if (error is FirebaseException) {
+      debugPrint('Firebase error plugin=${error.plugin}');
+      debugPrint('Firebase error code=${error.code}');
+      debugPrint('Firebase error message=${error.message}');
+    } else {
+      debugPrint('Error type=${error.runtimeType}');
+      debugPrint('Error=$error');
+    }
+    debugPrintStack(
+      label: 'FirebaseAuthService.$action stack',
+      stackTrace: stackTrace,
+    );
+  }
+
   Future<void> _restoreCurrentUser() async {
     final authUser = fb.FirebaseAuth.instance.currentUser;
     if (authUser == null) {
@@ -30,11 +46,13 @@ class FirebaseAuthService extends ChangeNotifier {
 
     try {
       await _loadProfile(authUser);
-    } on FirebaseException catch (error) {
+    } on FirebaseException catch (error, stackTrace) {
+      _debugAuthError('restoreCurrentUser', error, stackTrace);
       _lastError = error.message ?? error.code;
       _currentUser = null;
       await fb.FirebaseAuth.instance.signOut();
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _debugAuthError('restoreCurrentUser', error, stackTrace);
       _lastError = error.toString();
       _currentUser = null;
       await fb.FirebaseAuth.instance.signOut();
@@ -87,11 +105,13 @@ class FirebaseAuthService extends ChangeNotifier {
       await _loadProfile(credential.user!);
       notifyListeners();
       return true;
-    } on fb.FirebaseAuthException catch (error) {
+    } on fb.FirebaseAuthException catch (error, stackTrace) {
+      _debugAuthError('login', error, stackTrace);
       _lastError = error.message ?? error.code;
       await fb.FirebaseAuth.instance.signOut();
       return false;
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _debugAuthError('login', error, stackTrace);
       _lastError = error.toString();
       await fb.FirebaseAuth.instance.signOut();
       return false;
@@ -125,11 +145,13 @@ class FirebaseAuthService extends ChangeNotifier {
       _currentUser = profile;
       notifyListeners();
       return true;
-    } on fb.FirebaseAuthException catch (error) {
+    } on fb.FirebaseAuthException catch (error, stackTrace) {
+      _debugAuthError('registerStudent', error, stackTrace);
       await _deleteIncompleteAuthUser(createdAuthUser);
       _lastError = error.message ?? error.code;
       return false;
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _debugAuthError('registerStudent', error, stackTrace);
       await _deleteIncompleteAuthUser(createdAuthUser);
       _lastError = error.toString();
       return false;
@@ -141,8 +163,8 @@ class FirebaseAuthService extends ChangeNotifier {
 
     try {
       await user.delete();
-    } catch (error) {
-      debugPrint('Could not delete incomplete auth user: $error');
+    } catch (error, stackTrace) {
+      _debugAuthError('deleteIncompleteAuthUser', error, stackTrace);
       await fb.FirebaseAuth.instance.signOut();
     }
   }
@@ -156,6 +178,8 @@ class FirebaseAuthService extends ChangeNotifier {
 
     if (_currentUser?.role != UserRole.admin) {
       _lastError = 'Only admins can create driver accounts.';
+      debugPrint('FirebaseAuthService.createDriverAccount failed');
+      debugPrint(_lastError);
       return false;
     }
 
@@ -183,16 +207,20 @@ class FirebaseAuthService extends ChangeNotifier {
       await _writeProfile(profile);
       await temporaryAuth.signOut();
       return true;
-    } on fb.FirebaseAuthException catch (error) {
+    } on fb.FirebaseAuthException catch (error, stackTrace) {
+      _debugAuthError('createDriverAccount', error, stackTrace);
       _lastError = error.message ?? error.code;
       return false;
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _debugAuthError('createDriverAccount', error, stackTrace);
       if (createdAuthUser != null) {
         try {
           await createdAuthUser.delete();
-        } catch (deleteError) {
-          debugPrint(
-            'Could not delete incomplete driver auth user: $deleteError',
+        } catch (deleteError, deleteStackTrace) {
+          _debugAuthError(
+            'deleteIncompleteDriverAuthUser',
+            deleteError,
+            deleteStackTrace,
           );
         }
       }
@@ -204,8 +232,8 @@ class FirebaseAuthService extends ChangeNotifier {
         try {
           await fb.FirebaseAuth.instanceFor(app: temporaryApp).signOut();
           await temporaryApp.delete();
-        } catch (error) {
-          debugPrint('Could not clean up temporary Firebase app: $error');
+        } catch (error, stackTrace) {
+          _debugAuthError('cleanupTemporaryFirebaseApp', error, stackTrace);
         }
       }
     }
