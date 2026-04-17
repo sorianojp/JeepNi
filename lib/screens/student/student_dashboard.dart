@@ -20,6 +20,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   final MapController _mapController = MapController();
   bool _hasCenteredMap = false;
+  String? _followedDriverId;
+  LatLng? _lastFollowedDriverLocation;
 
   String _distanceLabel(LatLng? from, LatLng? to) {
     if (from == null) return 'Start sharing to calculate distance';
@@ -44,9 +46,39 @@ class _StudentDashboardState extends State<StudentDashboard> {
     return '${speedKmh.round()} km/h';
   }
 
-  void _focusDriver(LatLng? driverLocation) {
+  void _followDriver(String driverId, LatLng driverLocation) {
+    setState(() {
+      _followedDriverId = driverId;
+      _lastFollowedDriverLocation = null;
+    });
+    _moveMap(driverLocation, 16.0);
+  }
+
+  void _stopFollowingDriver() {
+    setState(() {
+      _followedDriverId = null;
+      _lastFollowedDriverLocation = null;
+    });
+  }
+
+  void _syncFollowedDriverCamera(LatLng? driverLocation) {
     if (driverLocation == null) return;
-    _mapController.move(driverLocation, 16.0);
+    final lastLocation = _lastFollowedDriverLocation;
+    if (lastLocation != null &&
+        lastLocation.latitude == driverLocation.latitude &&
+        lastLocation.longitude == driverLocation.longitude) {
+      return;
+    }
+
+    _lastFollowedDriverLocation = driverLocation;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _followedDriverId == null) return;
+      _moveMap(driverLocation, 16.0);
+    });
+  }
+
+  void _moveMap(LatLng location, double zoom) {
+    _mapController.move(location, zoom);
   }
 
   @override
@@ -67,6 +99,12 @@ class _StudentDashboardState extends State<StudentDashboard> {
     final myLocation = trackingService.getLocation(user.id);
     final isSharing = trackingService.isSharingLocation(user.id);
     final isStarting = trackingService.isStartingLocationStream;
+    final followedDriverLocation = _followedDriverId == null
+        ? null
+        : trackingService.getLocation(_followedDriverId!);
+    final followedDriverName = _followedDriverId == null
+        ? null
+        : trackingService.displayNameFor(_followedDriverId!);
     final mapCenter =
         myLocation ??
         (driverLocations.isEmpty ? null : driverLocations.first.value);
@@ -77,6 +115,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
         _mapController.move(mapCenter, 15.0);
       });
     }
+    _syncFollowedDriverCamera(followedDriverLocation);
 
     return Scaffold(
       appBar: AppBar(
@@ -148,66 +187,87 @@ class _StudentDashboardState extends State<StudentDashboard> {
           Expanded(
             child: mapCenter == null
                 ? const Center(child: Text('Waiting for live location...'))
-                : FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: mapCenter,
-                      initialZoom: 15.0,
-                    ),
+                : Stack(
                     children: [
-                      ColoredBox(color: Colors.grey.shade200),
-                      const AppMapTileLayer(),
-                      MarkerLayer(
-                        markers: [
-                          if (myLocation != null)
-                            Marker(
-                              point: myLocation,
-                              width: 80,
-                              height: 80,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.person_pin_circle,
-                                    color: Colors.blue,
-                                    size: 40,
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.9,
+                      FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: mapCenter,
+                          initialZoom: 15.0,
+                        ),
+                        children: [
+                          ColoredBox(color: Colors.grey.shade200),
+                          const AppMapTileLayer(),
+                          MarkerLayer(
+                            markers: [
+                              if (myLocation != null)
+                                Marker(
+                                  point: myLocation,
+                                  width: 80,
+                                  height: 80,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.person_pin_circle,
+                                        color: Colors.blue,
+                                        size: 40,
                                       ),
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                    child: const Text(
-                                      'Me',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.9,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Me',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
+                                ),
+                              ...driverLocations.map(
+                                (driver) => Marker(
+                                  point: driver.value,
+                                  width: 80,
+                                  height: 80,
+                                  child: Icon(
+                                    Icons.directions_bus,
+                                    color: driver.key == _followedDriverId
+                                        ? Colors.orange
+                                        : Colors.green,
+                                    size: driver.key == _followedDriverId
+                                        ? 46
+                                        : 40,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ...driverLocations.map(
-                            (driver) => Marker(
-                              point: driver.value,
-                              width: 80,
-                              height: 80,
-                              child: const Icon(
-                                Icons.directions_bus,
-                                color: Colors.green,
-                                size: 40,
-                              ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
+                      if (_followedDriverId != null)
+                        Positioned(
+                          left: 12,
+                          right: 12,
+                          top: 12,
+                          child: _FollowingDriverBanner(
+                            driverName: followedDriverName ?? 'Driver',
+                            hasLiveLocation: followedDriverLocation != null,
+                            onStop: _stopFollowingDriver,
+                          ),
+                        ),
                     ],
                   ),
           ),
@@ -264,10 +324,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                   enabled: driverLocation != null,
                                   onTap: driverLocation == null
                                       ? null
-                                      : () => _focusDriver(driverLocation),
-                                  leading: const Icon(
+                                      : () => _followDriver(
+                                          driverId,
+                                          driverLocation,
+                                        ),
+                                  leading: Icon(
                                     Icons.directions_bus,
-                                    color: Colors.green,
+                                    color: driverId == _followedDriverId
+                                        ? Colors.orange
+                                        : Colors.green,
                                   ),
                                   title: Text(
                                     trackingService.displayNameFor(driverId),
@@ -287,6 +352,59 @@ class _StudentDashboardState extends State<StudentDashboard> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FollowingDriverBanner extends StatelessWidget {
+  const _FollowingDriverBanner({
+    required this.driverName,
+    required this.hasLiveLocation,
+    required this.onStop,
+  });
+
+  final String driverName;
+  final bool hasLiveLocation;
+  final VoidCallback onStop;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        child: Row(
+          children: [
+            Icon(
+              hasLiveLocation ? Icons.navigation : Icons.location_off,
+              color: hasLiveLocation ? Colors.orange : Colors.grey,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                hasLiveLocation
+                    ? 'Following $driverName'
+                    : 'Waiting for $driverName location',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            TextButton(onPressed: onStop, child: const Text('Stop')),
+          ],
+        ),
       ),
     );
   }

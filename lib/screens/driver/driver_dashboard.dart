@@ -35,6 +35,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
   final MapController _mapController = MapController();
   bool _hasCenteredMap = false;
+  LatLng? _lastFollowedLocation;
 
   String _speedLabel(double? speedKmh) {
     if (speedKmh == null) return '-- km/h';
@@ -73,6 +74,22 @@ class _DriverDashboardState extends State<DriverDashboard> {
     return clusters;
   }
 
+  void _syncDriverCamera(LatLng? driverLocation) {
+    if (driverLocation == null) return;
+    final lastLocation = _lastFollowedLocation;
+    if (lastLocation != null &&
+        lastLocation.latitude == driverLocation.latitude &&
+        lastLocation.longitude == driverLocation.longitude) {
+      return;
+    }
+
+    _lastFollowedLocation = driverLocation;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _mapController.move(driverLocation, 16.0);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<FirebaseAuthService>(context);
@@ -105,6 +122,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
         _mapController.move(mapCenter, 14.0);
       });
     }
+    _syncDriverCamera(myLocation);
 
     return Scaffold(
       appBar: AppBar(
