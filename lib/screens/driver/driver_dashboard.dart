@@ -6,6 +6,7 @@ import '../../services/firebase_tracking_service.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
+import '../../core/map_camera_animator.dart';
 import '../../widgets/app_map_tile_layer.dart';
 
 class _StudentCluster {
@@ -30,12 +31,30 @@ class DriverDashboard extends StatefulWidget {
   State<DriverDashboard> createState() => _DriverDashboardState();
 }
 
-class _DriverDashboardState extends State<DriverDashboard> {
+class _DriverDashboardState extends State<DriverDashboard>
+    with TickerProviderStateMixin {
   static const double _studentClusterRadiusMeters = 30;
+  static const double _cameraMoveThresholdMeters = 2;
 
   final MapController _mapController = MapController();
+  late final MapCameraAnimator _cameraAnimator;
   bool _hasCenteredMap = false;
   LatLng? _lastFollowedLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _cameraAnimator = MapCameraAnimator(
+      mapController: _mapController,
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _cameraAnimator.dispose();
+    super.dispose();
+  }
 
   String _speedLabel(double? speedKmh) {
     if (speedKmh == null) return '-- km/h';
@@ -77,16 +96,20 @@ class _DriverDashboardState extends State<DriverDashboard> {
   void _syncDriverCamera(LatLng? driverLocation) {
     if (driverLocation == null) return;
     final lastLocation = _lastFollowedLocation;
-    if (lastLocation != null &&
-        lastLocation.latitude == driverLocation.latitude &&
-        lastLocation.longitude == driverLocation.longitude) {
-      return;
+    if (lastLocation != null) {
+      final distance = Geolocator.distanceBetween(
+        lastLocation.latitude,
+        lastLocation.longitude,
+        driverLocation.latitude,
+        driverLocation.longitude,
+      );
+      if (distance < _cameraMoveThresholdMeters) return;
     }
 
     _lastFollowedLocation = driverLocation;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _mapController.move(driverLocation, 16.0);
+      _cameraAnimator.animateTo(driverLocation, 16.0);
     });
   }
 
@@ -119,7 +142,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
       _hasCenteredMap = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _mapController.move(mapCenter, 14.0);
+        _cameraAnimator.jumpTo(mapCenter, 14.0);
       });
     }
     _syncDriverCamera(myLocation);
@@ -189,37 +212,41 @@ class _DriverDashboardState extends State<DriverDashboard> {
           Expanded(
             child: mapCenter == null
                 ? const Center(child: Text('Waiting for live location...'))
-                : FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: mapCenter,
-                      initialZoom: 14.0,
-                    ),
+                : Stack(
                     children: [
-                      ColoredBox(color: Colors.grey.shade200),
-                      const AppMapTileLayer(),
-                      MarkerLayer(
-                        markers: [
-                          if (myLocation != null)
-                            Marker(
-                              point: myLocation,
-                              width: 80,
-                              height: 80,
-                              child: const Icon(
-                                Icons.directions_bus,
-                                color: Colors.green,
-                                size: 40,
+                      FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: mapCenter,
+                          initialZoom: 14.0,
+                        ),
+                        children: [
+                          ColoredBox(color: Colors.grey.shade200),
+                          const AppMapTileLayer(),
+                          MarkerLayer(
+                            markers: [
+                              if (myLocation != null)
+                                Marker(
+                                  point: myLocation,
+                                  width: 80,
+                                  height: 80,
+                                  child: const Icon(
+                                    Icons.directions_bus,
+                                    color: Colors.green,
+                                    size: 44,
+                                  ),
+                                ),
+                              ...studentClusters.map(
+                                (cluster) => Marker(
+                                  point: cluster.center,
+                                  width: 80,
+                                  height: 80,
+                                  child: _StudentClusterMarker(
+                                    count: cluster.count,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ...studentClusters.map(
-                            (cluster) => Marker(
-                              point: cluster.center,
-                              width: 80,
-                              height: 80,
-                              child: _StudentClusterMarker(
-                                count: cluster.count,
-                              ),
-                            ),
+                            ],
                           ),
                         ],
                       ),

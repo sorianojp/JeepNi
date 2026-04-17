@@ -6,6 +6,7 @@ import '../../services/firebase_tracking_service.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
+import '../../core/map_camera_animator.dart';
 import '../../widgets/app_map_tile_layer.dart';
 
 class StudentDashboard extends StatefulWidget {
@@ -15,13 +16,31 @@ class StudentDashboard extends StatefulWidget {
   State<StudentDashboard> createState() => _StudentDashboardState();
 }
 
-class _StudentDashboardState extends State<StudentDashboard> {
+class _StudentDashboardState extends State<StudentDashboard>
+    with TickerProviderStateMixin {
   static const double _driverListHeight = 230;
+  static const double _cameraMoveThresholdMeters = 2;
 
   final MapController _mapController = MapController();
+  late final MapCameraAnimator _cameraAnimator;
   bool _hasCenteredMap = false;
   String? _followedDriverId;
   LatLng? _lastFollowedDriverLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _cameraAnimator = MapCameraAnimator(
+      mapController: _mapController,
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _cameraAnimator.dispose();
+    super.dispose();
+  }
 
   String _distanceLabel(LatLng? from, LatLng? to) {
     if (from == null) return 'Start sharing to calculate distance';
@@ -51,7 +70,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
       _followedDriverId = driverId;
       _lastFollowedDriverLocation = null;
     });
-    _moveMap(driverLocation, 16.0);
+    _cameraAnimator.animateTo(driverLocation, 16.0);
   }
 
   void _stopFollowingDriver() {
@@ -64,21 +83,21 @@ class _StudentDashboardState extends State<StudentDashboard> {
   void _syncFollowedDriverCamera(LatLng? driverLocation) {
     if (driverLocation == null) return;
     final lastLocation = _lastFollowedDriverLocation;
-    if (lastLocation != null &&
-        lastLocation.latitude == driverLocation.latitude &&
-        lastLocation.longitude == driverLocation.longitude) {
-      return;
+    if (lastLocation != null) {
+      final distance = Geolocator.distanceBetween(
+        lastLocation.latitude,
+        lastLocation.longitude,
+        driverLocation.latitude,
+        driverLocation.longitude,
+      );
+      if (distance < _cameraMoveThresholdMeters) return;
     }
 
     _lastFollowedDriverLocation = driverLocation;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _followedDriverId == null) return;
-      _moveMap(driverLocation, 16.0);
+      _cameraAnimator.animateTo(driverLocation, 16.0);
     });
-  }
-
-  void _moveMap(LatLng location, double zoom) {
-    _mapController.move(location, zoom);
   }
 
   @override
@@ -112,7 +131,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
       _hasCenteredMap = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _mapController.move(mapCenter, 15.0);
+        _cameraAnimator.jumpTo(mapCenter, 15.0);
       });
     }
     _syncFollowedDriverCamera(followedDriverLocation);

@@ -128,6 +128,12 @@ class FirebaseTrackingService extends ChangeNotifier {
               }
             }
 
+            _keepLocalSharingPosition(
+              nextLocations,
+              nextSpeedsKmh,
+              nextUpdatedAt,
+            );
+
             _userLocations
               ..clear()
               ..addAll(nextLocations);
@@ -143,6 +149,27 @@ class FirebaseTrackingService extends ChangeNotifier {
             debugPrint('Location listener skipped: $error');
           },
         );
+  }
+
+  void _keepLocalSharingPosition(
+    Map<String, LatLng> nextLocations,
+    Map<String, double> nextSpeedsKmh,
+    Map<String, DateTime> nextUpdatedAt,
+  ) {
+    final sharingUserId = _sharingUserId;
+    final lastPosition = _lastPosition;
+    if (sharingUserId == null || lastPosition == null) {
+      return;
+    }
+
+    nextLocations[sharingUserId] = LatLng(
+      lastPosition.latitude,
+      lastPosition.longitude,
+    );
+    nextSpeedsKmh[sharingUserId] = lastPosition.speed <= 0
+        ? 0.0
+        : lastPosition.speed * 3.6;
+    nextUpdatedAt[sharingUserId] = DateTime.now();
   }
 
   void _stopListening() {
