@@ -38,6 +38,7 @@ class _DriverDashboardState extends State<DriverDashboard>
   static const double _studentClusterRadiusMeters = 30;
   static const double _cameraMoveThresholdMeters = 2;
   static const double _offscreenIndicatorPadding = 18;
+  static const double _offscreenIndicatorBottomInsetFraction = 0.14;
 
   final MapController _mapController = MapController();
   late final MapCameraAnimator _cameraAnimator;
@@ -228,6 +229,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                   clusters: studentClusters,
                   mapController: _mapController,
                   padding: _offscreenIndicatorPadding,
+                  bottomInsetFraction: _offscreenIndicatorBottomInsetFraction,
                   onTapCluster: (cluster) {
                     _cameraAnimator.animateTo(cluster.center, 16.0);
                   },
@@ -552,12 +554,14 @@ class _OffscreenStudentIndicators extends StatelessWidget {
     required this.clusters,
     required this.mapController,
     required this.padding,
+    required this.bottomInsetFraction,
     required this.onTapCluster,
   });
 
   final List<_StudentCluster> clusters;
   final MapController mapController;
   final double padding;
+  final double bottomInsetFraction;
   final ValueChanged<_StudentCluster> onTapCluster;
 
   @override
@@ -576,6 +580,7 @@ class _OffscreenStudentIndicators extends StatelessWidget {
         final bounds = camera.visibleBounds;
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
+        final bottomLimit = height - (height * bottomInsetFraction) - padding;
         final indicators = <Widget>[];
 
         for (final cluster in clusters) {
@@ -585,7 +590,7 @@ class _OffscreenStudentIndicators extends StatelessWidget {
 
           final screenOffset = camera.latLngToScreenOffset(cluster.center);
           final x = screenOffset.dx.clamp(padding, width - padding);
-          final y = screenOffset.dy.clamp(padding, height - padding);
+          final y = screenOffset.dy.clamp(padding, bottomLimit);
 
           indicators.add(
             Positioned(

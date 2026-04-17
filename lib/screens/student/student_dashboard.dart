@@ -22,6 +22,7 @@ class _StudentDashboardState extends State<StudentDashboard>
     with TickerProviderStateMixin {
   static const double _cameraMoveThresholdMeters = 2;
   static const double _offscreenIndicatorPadding = 18;
+  static const double _offscreenIndicatorBottomInsetFraction = 0.14;
 
   final MapController _mapController = MapController();
   late final MapCameraAnimator _cameraAnimator;
@@ -228,6 +229,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                   followedDriverId: _followedDriverId,
                   mapController: _mapController,
                   padding: _offscreenIndicatorPadding,
+                  bottomInsetFraction: _offscreenIndicatorBottomInsetFraction,
                   onTapDriver: _followDriver,
                 ),
                 Positioned(
@@ -325,6 +327,7 @@ class _OffscreenDriverIndicators extends StatelessWidget {
     required this.followedDriverId,
     required this.mapController,
     required this.padding,
+    required this.bottomInsetFraction,
     required this.onTapDriver,
   });
 
@@ -332,6 +335,7 @@ class _OffscreenDriverIndicators extends StatelessWidget {
   final String? followedDriverId;
   final MapController mapController;
   final double padding;
+  final double bottomInsetFraction;
   final void Function(String driverId, LatLng driverLocation) onTapDriver;
 
   @override
@@ -350,6 +354,7 @@ class _OffscreenDriverIndicators extends StatelessWidget {
         final bounds = camera.visibleBounds;
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
+        final bottomLimit = height - (height * bottomInsetFraction) - padding;
         final indicators = <Widget>[];
 
         for (final driver in drivers) {
@@ -359,7 +364,7 @@ class _OffscreenDriverIndicators extends StatelessWidget {
 
           final screenOffset = camera.latLngToScreenOffset(driver.value);
           final x = screenOffset.dx.clamp(padding, width - padding);
-          final y = screenOffset.dy.clamp(padding, height - padding);
+          final y = screenOffset.dy.clamp(padding, bottomLimit);
           final isFollowed = driver.key == followedDriverId;
 
           indicators.add(
