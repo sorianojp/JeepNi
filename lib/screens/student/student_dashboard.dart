@@ -76,8 +76,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
+            onPressed: () async {
+              await trackingService.stopSharingLocation(user.id);
               authService.logout();
+              if (!context.mounted) return;
               context.go('/login');
             },
           ),

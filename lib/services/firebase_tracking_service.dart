@@ -7,9 +7,13 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 class FirebaseTrackingService extends ChangeNotifier {
+  static const Duration _heartbeatInterval = Duration(seconds: 30);
+  static const Duration _staleLocationTimeout = Duration(minutes: 3);
+
   final Map<String, LatLng> _userLocations = <String, LatLng>{};
   final Map<String, String> _userNames = <String, String>{};
   final Map<String, double> _userSpeedsKmh = <String, double>{};
+  final Map<String, DateTime> _userLocationUpdatedAt = <String, DateTime>{};
   final Set<String> _driverIds = <String>{};
   final Set<String> _studentIds = <String>{};
 
@@ -17,6 +21,8 @@ class FirebaseTrackingService extends ChangeNotifier {
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subscription;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<fb.User?>? _authSubscription;
+  Timer? _heartbeatTimer;
+  Position? _lastPosition;
   String? _sharingUserId;
   bool _isStartingLocationStream = false;
   String? _locationError;
@@ -93,16 +99,24 @@ class FirebaseTrackingService extends ChangeNotifier {
           (snapshot) {
             final nextLocations = <String, LatLng>{};
             final nextSpeedsKmh = <String, double>{};
+            final nextUpdatedAt = <String, DateTime>{};
+            final staleBefore = DateTime.now().subtract(_staleLocationTimeout);
 
             for (final doc in snapshot.docs) {
               final data = doc.data();
               final latitude = data['latitude'];
               final longitude = data['longitude'];
+              final updatedAt = _updatedAtFromValue(data['updatedAt']);
+              if (updatedAt == null || updatedAt.isBefore(staleBefore)) {
+                continue;
+              }
+
               if (latitude is num && longitude is num) {
                 nextLocations[doc.id] = LatLng(
                   latitude.toDouble(),
                   longitude.toDouble(),
                 );
+                nextUpdatedAt[doc.id] = updatedAt;
                 final speedKmh = data['speedKmh'];
                 if (speedKmh is num) {
                   nextSpeedsKmh[doc.id] = speedKmh.toDouble();
@@ -116,6 +130,9 @@ class FirebaseTrackingService extends ChangeNotifier {
             _userSpeedsKmh
               ..clear()
               ..addAll(nextSpeedsKmh);
+            _userLocationUpdatedAt
+              ..clear()
+              ..addAll(nextUpdatedAt);
             notifyListeners();
           },
           onError: (Object error) {
@@ -131,12 +148,16 @@ class FirebaseTrackingService extends ChangeNotifier {
     _subscription = null;
     _positionSubscription?.cancel();
     _positionSubscription = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _lastPosition = null;
     _sharingUserId = null;
     _isStartingLocationStream = false;
     _driverIds.clear();
     _studentIds.clear();
     _userNames.clear();
     _userSpeedsKmh.clear();
+    _userLocationUpdatedAt.clear();
     _userLocations.clear();
   }
 
@@ -157,6 +178,9 @@ class FirebaseTrackingService extends ChangeNotifier {
     if (_positionSubscription != null && _sharingUserId != userId) {
       await _positionSubscription?.cancel();
       _positionSubscription = null;
+      _heartbeatTimer?.cancel();
+      _heartbeatTimer = null;
+      _lastPosition = null;
     }
 
     _isStartingLocationStream = true;
@@ -197,20 +221,36 @@ class FirebaseTrackingService extends ChangeNotifier {
           },
         );
     _sharingUserId = userId;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
+      final lastPosition = _lastPosition;
+      final sharingUserId = _sharingUserId;
+      if (lastPosition != null && sharingUserId == userId) {
+        _writePosition(sharingUserId!, lastPosition);
+      }
+    });
     _isStartingLocationStream = false;
     notifyListeners();
   }
 
   Future<void> stopSharingLocation(String userId) async {
-    if (_sharingUserId != userId) {
+    final currentUser = fb.FirebaseAuth.instance.currentUser;
+    if (currentUser?.uid != userId) {
       return;
     }
 
-    await _positionSubscription?.cancel();
-    _positionSubscription = null;
-    _sharingUserId = null;
+    if (_sharingUserId == userId) {
+      await _positionSubscription?.cancel();
+      _positionSubscription = null;
+      _heartbeatTimer?.cancel();
+      _heartbeatTimer = null;
+      _lastPosition = null;
+      _sharingUserId = null;
+    }
+
     _userLocations.remove(userId);
     _userSpeedsKmh.remove(userId);
+    _userLocationUpdatedAt.remove(userId);
     await FirebaseFirestore.instance
         .collection('locations')
         .doc(userId)
@@ -254,8 +294,11 @@ class FirebaseTrackingService extends ChangeNotifier {
   Future<void> _writePosition(String userId, Position position) async {
     final nextLocation = LatLng(position.latitude, position.longitude);
     final speedKmh = position.speed <= 0 ? 0.0 : position.speed * 3.6;
+    final now = DateTime.now();
+    _lastPosition = position;
     _userLocations[userId] = nextLocation;
     _userSpeedsKmh[userId] = speedKmh;
+    _userLocationUpdatedAt[userId] = now;
     await FirebaseFirestore.instance.collection('locations').doc(userId).set({
       'latitude': position.latitude,
       'longitude': position.longitude,
@@ -304,12 +347,19 @@ class FirebaseTrackingService extends ChangeNotifier {
   Future<void> updateLocation(String userId, LatLng newLocation) async {
     _ensureListening();
     _userLocations[userId] = newLocation;
+    _userLocationUpdatedAt[userId] = DateTime.now();
     await FirebaseFirestore.instance.collection('locations').doc(userId).set({
       'latitude': newLocation.latitude,
       'longitude': newLocation.longitude,
       'updatedAt': FieldValue.serverTimestamp(),
     });
     notifyListeners();
+  }
+
+  DateTime? _updatedAtFromValue(Object? value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
   }
 
   @override
