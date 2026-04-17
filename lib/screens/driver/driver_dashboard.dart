@@ -228,12 +228,10 @@ class _DriverDashboardState extends State<DriverDashboard>
                               if (myLocation != null)
                                 Marker(
                                   point: myLocation,
-                                  width: 80,
-                                  height: 80,
-                                  child: const Icon(
-                                    Icons.directions_bus,
-                                    color: Colors.green,
-                                    size: 44,
+                                  width: 92,
+                                  height: 92,
+                                  child: _DriverMarker(
+                                    speedLabel: _speedLabel(speedKmh),
                                   ),
                                 ),
                               ...studentClusters.map(
@@ -264,6 +262,40 @@ class _DriverDashboardState extends State<DriverDashboard>
             ),
         ],
       ),
+    );
+  }
+}
+
+class _DriverMarker extends StatelessWidget {
+  const _DriverMarker({required this.speedLabel});
+
+  final String speedLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.directions_bus, color: Colors.green, size: 44),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.green.shade200),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            child: Text(
+              speedLabel,
+              style: const TextStyle(
+                color: Colors.green,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

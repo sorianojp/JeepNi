@@ -203,14 +203,13 @@ class _StudentDashboardState extends State<StudentDashboard>
                         ...driverLocations.map(
                           (driver) => Marker(
                             point: driver.value,
-                            width: 80,
-                            height: 80,
-                            child: Icon(
-                              Icons.directions_bus,
-                              color: driver.key == _followedDriverId
-                                  ? Colors.orange
-                                  : Colors.green,
-                              size: driver.key == _followedDriverId ? 46 : 40,
+                            width: 96,
+                            height: 96,
+                            child: _DriverMapMarker(
+                              speedLabel: _speedLabel(
+                                trackingService.getSpeedKmh(driver.key),
+                              ),
+                              isFollowed: driver.key == _followedDriverId,
                             ),
                           ),
                         ),
@@ -266,6 +265,43 @@ class _StudentDashboardState extends State<StudentDashboard>
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _DriverMapMarker extends StatelessWidget {
+  const _DriverMapMarker({required this.speedLabel, required this.isFollowed});
+
+  final String speedLabel;
+  final bool isFollowed;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isFollowed ? Colors.orange : Colors.green;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.directions_bus, color: color, size: isFollowed ? 46 : 40),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: color.withValues(alpha: 0.35)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            child: Text(
+              speedLabel,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

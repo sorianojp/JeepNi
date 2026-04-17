@@ -7,11 +7,16 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 class FirebaseTrackingService extends ChangeNotifier {
-  static const Duration _heartbeatInterval = Duration(seconds: 15);
+  static const Duration _heartbeatInterval = Duration(seconds: 5);
   static const Duration _liveUpdateInterval = Duration(seconds: 2);
   static const Duration _currentLocationTimeout = Duration(seconds: 12);
   static const Duration _staleLocationTimeout = Duration(minutes: 3);
   static const int _liveDistanceFilterMeters = 1;
+  static const double _minimumMovingSpeedKmh = 1;
+  static const double _maximumPlausibleSpeedKmh = 180;
+  static const double _speedSmoothingFactor = 0.45;
+  static const double _stationaryDistanceMeters = 3;
+  static const Duration _stationarySpeedTimeout = Duration(seconds: 8);
 
   final Map<String, LatLng> _userLocations = <String, LatLng>{};
   final Map<String, String> _userNames = <String, String>{};
@@ -26,6 +31,8 @@ class FirebaseTrackingService extends ChangeNotifier {
   StreamSubscription<fb.User?>? _authSubscription;
   Timer? _heartbeatTimer;
   Position? _lastPosition;
+  Position? _lastMeaningfulMovementPosition;
+  DateTime? _lastMeaningfulMovementAt;
   String? _sharingUserId;
   bool _isStartingLocationStream = false;
   bool _isRefreshingCurrentPosition = false;
@@ -166,9 +173,7 @@ class FirebaseTrackingService extends ChangeNotifier {
       lastPosition.latitude,
       lastPosition.longitude,
     );
-    nextSpeedsKmh[sharingUserId] = lastPosition.speed <= 0
-        ? 0.0
-        : lastPosition.speed * 3.6;
+    nextSpeedsKmh[sharingUserId] = _userSpeedsKmh[sharingUserId] ?? 0.0;
     nextUpdatedAt[sharingUserId] = DateTime.now();
   }
 
@@ -182,6 +187,8 @@ class FirebaseTrackingService extends ChangeNotifier {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
     _lastPosition = null;
+    _lastMeaningfulMovementPosition = null;
+    _lastMeaningfulMovementAt = null;
     _sharingUserId = null;
     _isStartingLocationStream = false;
     _isRefreshingCurrentPosition = false;
@@ -213,6 +220,8 @@ class FirebaseTrackingService extends ChangeNotifier {
       _heartbeatTimer?.cancel();
       _heartbeatTimer = null;
       _lastPosition = null;
+      _lastMeaningfulMovementPosition = null;
+      _lastMeaningfulMovementAt = null;
     }
 
     _isStartingLocationStream = true;
@@ -268,6 +277,8 @@ class FirebaseTrackingService extends ChangeNotifier {
       _heartbeatTimer?.cancel();
       _heartbeatTimer = null;
       _lastPosition = null;
+      _lastMeaningfulMovementPosition = null;
+      _lastMeaningfulMovementAt = null;
       _sharingUserId = null;
       _isRefreshingCurrentPosition = false;
     }
@@ -381,7 +392,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     } catch (error) {
       final lastPosition = _lastPosition;
       if (lastPosition != null && _sharingUserId == userId) {
-        await _writePosition(userId, lastPosition);
+        await _writePosition(userId, lastPosition, forceStopped: true);
       } else {
         debugPrint('Location refresh failed: $error');
       }
@@ -390,9 +401,17 @@ class FirebaseTrackingService extends ChangeNotifier {
     }
   }
 
-  Future<void> _writePosition(String userId, Position position) async {
+  Future<void> _writePosition(
+    String userId,
+    Position position, {
+    bool forceStopped = false,
+  }) async {
     final nextLocation = LatLng(position.latitude, position.longitude);
-    final speedKmh = position.speed <= 0 ? 0.0 : position.speed * 3.6;
+    final speedKmh = _speedKmhForPosition(
+      userId,
+      position,
+      forceStopped: forceStopped,
+    );
     final now = DateTime.now();
     _lastPosition = position;
     _userLocations[userId] = nextLocation;
@@ -406,6 +425,91 @@ class FirebaseTrackingService extends ChangeNotifier {
       'updatedAt': FieldValue.serverTimestamp(),
     });
     notifyListeners();
+  }
+
+  double _speedKmhForPosition(
+    String userId,
+    Position position, {
+    required bool forceStopped,
+  }) {
+    if (forceStopped || _isStationary(position)) {
+      return 0.0;
+    }
+
+    final deviceSpeedKmh = position.speed > 0 ? position.speed * 3.6 : 0.0;
+    final calculatedSpeedKmh = _calculatedSpeedKmh(_lastPosition, position);
+    final rawSpeedKmh =
+        deviceSpeedKmh < _minimumMovingSpeedKmh &&
+            calculatedSpeedKmh != null &&
+            calculatedSpeedKmh >= _minimumMovingSpeedKmh
+        ? calculatedSpeedKmh
+        : deviceSpeedKmh;
+
+    final previousSpeedKmh = _userSpeedsKmh[userId];
+    if (previousSpeedKmh == null || rawSpeedKmh < _minimumMovingSpeedKmh) {
+      return rawSpeedKmh;
+    }
+
+    return (previousSpeedKmh * (1 - _speedSmoothingFactor)) +
+        (rawSpeedKmh * _speedSmoothingFactor);
+  }
+
+  bool _isStationary(Position position) {
+    final now = DateTime.now();
+    final reference = _lastMeaningfulMovementPosition;
+    if (reference == null) {
+      _lastMeaningfulMovementPosition = position;
+      _lastMeaningfulMovementAt = now;
+      return false;
+    }
+
+    final meters = Geolocator.distanceBetween(
+      reference.latitude,
+      reference.longitude,
+      position.latitude,
+      position.longitude,
+    );
+    if (meters > _stationaryDistanceMeters) {
+      _lastMeaningfulMovementPosition = position;
+      _lastMeaningfulMovementAt = now;
+      return false;
+    }
+
+    final lastMovementAt = _lastMeaningfulMovementAt;
+    return lastMovementAt != null &&
+        now.difference(lastMovementAt) >= _stationarySpeedTimeout;
+  }
+
+  double? _calculatedSpeedKmh(Position? previous, Position current) {
+    if (previous == null) {
+      return null;
+    }
+
+    final elapsedSeconds =
+        current.timestamp
+            .difference(previous.timestamp)
+            .inMilliseconds
+            .abs()
+            .toDouble() /
+        1000;
+    if (elapsedSeconds <= 0) {
+      return null;
+    }
+
+    final meters = Geolocator.distanceBetween(
+      previous.latitude,
+      previous.longitude,
+      current.latitude,
+      current.longitude,
+    );
+    final speedKmh = (meters / elapsedSeconds) * 3.6;
+    if (speedKmh.isNaN ||
+        speedKmh.isInfinite ||
+        speedKmh > _maximumPlausibleSpeedKmh) {
+      return null;
+    }
+
+    return speedKmh;
   }
 
   LatLng? getLocation(String userId) {
