@@ -357,7 +357,7 @@ class _DriverMapErrorBanner extends StatelessWidget {
   }
 }
 
-class _StudentClustersBottomSheet extends StatelessWidget {
+class _StudentClustersBottomSheet extends StatefulWidget {
   const _StudentClustersBottomSheet({
     required this.clusters,
     required this.driverLocation,
@@ -371,13 +371,60 @@ class _StudentClustersBottomSheet extends StatelessWidget {
   final ValueChanged<_StudentCluster> onTapCluster;
 
   @override
+  State<_StudentClustersBottomSheet> createState() =>
+      _StudentClustersBottomSheetState();
+}
+
+class _StudentClustersBottomSheetState
+    extends State<_StudentClustersBottomSheet> {
+  static const double _collapsedSize = 0.12;
+  static const double _defaultSize = 0.22;
+  static const double _expandedSize = 0.48;
+
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
+  bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sheetController.addListener(_syncExpandedState);
+  }
+
+  @override
+  void dispose() {
+    _sheetController.removeListener(_syncExpandedState);
+    _sheetController.dispose();
+    super.dispose();
+  }
+
+  void _syncExpandedState() {
+    if (!_sheetController.isAttached) return;
+    final nextIsExpanded = _sheetController.size > 0.34;
+    if (nextIsExpanded == _isExpanded) return;
+    setState(() {
+      _isExpanded = nextIsExpanded;
+    });
+  }
+
+  void _toggleSheet() {
+    if (!_sheetController.isAttached) return;
+    _sheetController.animateTo(
+      _isExpanded ? _collapsedSize : _expandedSize,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.22,
-      minChildSize: 0.12,
-      maxChildSize: 0.48,
+      controller: _sheetController,
+      initialChildSize: _defaultSize,
+      minChildSize: _collapsedSize,
+      maxChildSize: _expandedSize,
       snap: true,
-      snapSizes: const [0.12, 0.22, 0.48],
+      snapSizes: const [_collapsedSize, _defaultSize, _expandedSize],
       builder: (context, scrollController) {
         return DecoratedBox(
           decoration: BoxDecoration(
@@ -402,31 +449,58 @@ class _StudentClustersBottomSheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Students Waiting',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _toggleSheet,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 12, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Students Waiting',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                _isExpanded
+                                    ? 'Tap to collapse'
+                                    : 'Tap to expand',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                        Text(
+                          '${widget.clusters.fold<int>(0, (total, cluster) => total + cluster.count)}',
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          _isExpanded
+                              ? Icons.keyboard_arrow_down
+                              : Icons.keyboard_arrow_up,
+                          color: Colors.grey.shade700,
+                        ),
+                      ],
                     ),
-                    Text(
-                      '${clusters.fold<int>(0, (total, cluster) => total + cluster.count)}',
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               Expanded(
-                child: clusters.isEmpty
+                child: widget.clusters.isEmpty
                     ? ListView(
                         controller: scrollController,
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -437,11 +511,11 @@ class _StudentClustersBottomSheet extends StatelessWidget {
                     : ListView.separated(
                         controller: scrollController,
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                        itemCount: clusters.length,
+                        itemCount: widget.clusters.length,
                         separatorBuilder: (context, index) =>
                             const Divider(height: 1),
                         itemBuilder: (context, index) {
-                          final cluster = clusters[index];
+                          final cluster = widget.clusters[index];
                           final title = cluster.count == 1
                               ? '1 student Waiting'
                               : '${cluster.count} students Waiting';
@@ -449,14 +523,17 @@ class _StudentClustersBottomSheet extends StatelessWidget {
                           return ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            onTap: () => onTapCluster(cluster),
+                            onTap: () => widget.onTapCluster(cluster),
                             leading: const Icon(
                               Icons.person_pin_circle,
                               color: Colors.blue,
                             ),
                             title: Text(title),
                             subtitle: Text(
-                              distanceLabel(driverLocation, cluster.center),
+                              widget.distanceLabel(
+                                widget.driverLocation,
+                                cluster.center,
+                              ),
                             ),
                           );
                         },

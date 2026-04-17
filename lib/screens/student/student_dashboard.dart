@@ -393,7 +393,7 @@ class _MapErrorBanner extends StatelessWidget {
   }
 }
 
-class _DriversBottomSheet extends StatelessWidget {
+class _DriversBottomSheet extends StatefulWidget {
   const _DriversBottomSheet({
     required this.driverIds,
     required this.myLocation,
@@ -413,13 +413,58 @@ class _DriversBottomSheet extends StatelessWidget {
   final void Function(String driverId, LatLng driverLocation) onFollowDriver;
 
   @override
+  State<_DriversBottomSheet> createState() => _DriversBottomSheetState();
+}
+
+class _DriversBottomSheetState extends State<_DriversBottomSheet> {
+  static const double _collapsedSize = 0.12;
+  static const double _defaultSize = 0.22;
+  static const double _expandedSize = 0.48;
+
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
+  bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sheetController.addListener(_syncExpandedState);
+  }
+
+  @override
+  void dispose() {
+    _sheetController.removeListener(_syncExpandedState);
+    _sheetController.dispose();
+    super.dispose();
+  }
+
+  void _syncExpandedState() {
+    if (!_sheetController.isAttached) return;
+    final nextIsExpanded = _sheetController.size > 0.34;
+    if (nextIsExpanded == _isExpanded) return;
+    setState(() {
+      _isExpanded = nextIsExpanded;
+    });
+  }
+
+  void _toggleSheet() {
+    if (!_sheetController.isAttached) return;
+    _sheetController.animateTo(
+      _isExpanded ? _collapsedSize : _expandedSize,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.22,
-      minChildSize: 0.12,
-      maxChildSize: 0.48,
+      controller: _sheetController,
+      initialChildSize: _defaultSize,
+      minChildSize: _collapsedSize,
+      maxChildSize: _expandedSize,
       snap: true,
-      snapSizes: const [0.12, 0.22, 0.48],
+      snapSizes: const [_collapsedSize, _defaultSize, _expandedSize],
       builder: (context, scrollController) {
         return DecoratedBox(
           decoration: BoxDecoration(
@@ -444,31 +489,58 @@ class _DriversBottomSheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Drivers Online',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _toggleSheet,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 12, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Drivers Online',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                _isExpanded
+                                    ? 'Tap to collapse'
+                                    : 'Tap to expand',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                        Text(
+                          '${widget.driverIds.length}',
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          _isExpanded
+                              ? Icons.keyboard_arrow_down
+                              : Icons.keyboard_arrow_up,
+                          color: Colors.grey.shade700,
+                        ),
+                      ],
                     ),
-                    Text(
-                      '${driverIds.length}',
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               Expanded(
-                child: driverIds.isEmpty
+                child: widget.driverIds.isEmpty
                     ? ListView(
                         controller: scrollController,
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -479,17 +551,15 @@ class _DriversBottomSheet extends StatelessWidget {
                     : ListView.separated(
                         controller: scrollController,
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                        itemCount: driverIds.length,
+                        itemCount: widget.driverIds.length,
                         separatorBuilder: (context, index) =>
                             const Divider(height: 1),
                         itemBuilder: (context, index) {
-                          final driverId = driverIds[index];
-                          final driverLocation = trackingService.getLocation(
-                            driverId,
-                          );
-                          final driverSpeedKmh = trackingService.getSpeedKmh(
-                            driverId,
-                          );
+                          final driverId = widget.driverIds[index];
+                          final driverLocation = widget.trackingService
+                              .getLocation(driverId);
+                          final driverSpeedKmh = widget.trackingService
+                              .getSpeedKmh(driverId);
 
                           return ListTile(
                             dense: true,
@@ -497,21 +567,23 @@ class _DriversBottomSheet extends StatelessWidget {
                             enabled: driverLocation != null,
                             onTap: driverLocation == null
                                 ? null
-                                : () =>
-                                      onFollowDriver(driverId, driverLocation),
+                                : () => widget.onFollowDriver(
+                                    driverId,
+                                    driverLocation,
+                                  ),
                             leading: Icon(
                               Icons.directions_bus,
-                              color: driverId == followedDriverId
+                              color: driverId == widget.followedDriverId
                                   ? Colors.orange
                                   : Colors.green,
                             ),
                             title: Text(
-                              trackingService.displayNameFor(driverId),
+                              widget.trackingService.displayNameFor(driverId),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
-                              '${distanceLabel(myLocation, driverLocation)} • ${speedLabel(driverSpeedKmh)}',
+                              '${widget.distanceLabel(widget.myLocation, driverLocation)} • ${widget.speedLabel(driverSpeedKmh)}',
                             ),
                           );
                         },
