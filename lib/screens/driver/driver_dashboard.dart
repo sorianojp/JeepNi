@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/map_camera_animator.dart';
 import '../../widgets/app_map_tile_layer.dart';
+import '../../widgets/map_recenter_button.dart';
 
 const double _driverOverlayRadius = 18;
 
@@ -134,6 +135,12 @@ class _DriverDashboardState extends State<DriverDashboard>
     });
   }
 
+  void _recenterToDriverLocation(LatLng? driverLocation) {
+    if (driverLocation == null) return;
+    _lastFollowedLocation = driverLocation;
+    _cameraAnimator.animateTo(driverLocation, 16.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<FirebaseAuthService>(context);
@@ -233,6 +240,12 @@ class _DriverDashboardState extends State<DriverDashboard>
                   onTapCluster: (cluster) {
                     _cameraAnimator.animateTo(cluster.center, 16.0);
                   },
+                ),
+                MapRecenterButton(
+                  enabled: myLocation != null,
+                  color: Colors.green,
+                  heroTag: 'driver-recenter-location',
+                  onPressed: () => _recenterToDriverLocation(myLocation),
                 ),
                 Positioned(
                   left: 12,

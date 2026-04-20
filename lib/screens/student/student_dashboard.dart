@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/map_camera_animator.dart';
 import '../../widgets/app_map_tile_layer.dart';
+import '../../widgets/map_recenter_button.dart';
 
 const double _studentOverlayRadius = 18;
 
@@ -81,6 +82,19 @@ class _StudentDashboardState extends State<StudentDashboard>
       _followedDriverId = null;
       _lastFollowedDriverLocation = null;
     });
+  }
+
+  void _recenterToStudentLocation(LatLng? studentLocation) {
+    if (studentLocation == null) return;
+
+    if (_followedDriverId != null || _lastFollowedDriverLocation != null) {
+      setState(() {
+        _followedDriverId = null;
+        _lastFollowedDriverLocation = null;
+      });
+    }
+
+    _cameraAnimator.animateTo(studentLocation, 16.0);
   }
 
   void _syncFollowedDriverCamera(LatLng? driverLocation) {
@@ -231,6 +245,12 @@ class _StudentDashboardState extends State<StudentDashboard>
                   padding: _offscreenIndicatorPadding,
                   bottomInsetFraction: _offscreenIndicatorBottomInsetFraction,
                   onTapDriver: _followDriver,
+                ),
+                MapRecenterButton(
+                  enabled: myLocation != null,
+                  color: Colors.blue,
+                  heroTag: 'student-recenter-location',
+                  onPressed: () => _recenterToStudentLocation(myLocation),
                 ),
                 Positioned(
                   left: 12,
