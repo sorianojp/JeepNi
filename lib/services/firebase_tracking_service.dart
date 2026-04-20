@@ -8,9 +8,11 @@ import 'package:latlong2/latlong.dart';
 
 class FirebaseTrackingService extends ChangeNotifier {
   static const Duration _heartbeatInterval = Duration(seconds: 5);
+  static const Duration _freshnessTickInterval = Duration(seconds: 15);
   static const Duration _liveUpdateInterval = Duration(seconds: 2);
   static const Duration _currentLocationTimeout = Duration(seconds: 12);
   static const Duration _staleLocationTimeout = Duration(minutes: 3);
+  static const Duration _freshLocationDuration = Duration(seconds: 60);
   static const int _liveDistanceFilterMeters = 1;
   static const double _minimumMovingSpeedKmh = 1;
   static const double _maximumPlausibleSpeedKmh = 180;
@@ -30,6 +32,7 @@ class FirebaseTrackingService extends ChangeNotifier {
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<fb.User?>? _authSubscription;
   Timer? _heartbeatTimer;
+  Timer? _freshnessTimer;
   Position? _lastPosition;
   Position? _lastMeaningfulMovementPosition;
   DateTime? _lastMeaningfulMovementAt;
@@ -156,6 +159,10 @@ class FirebaseTrackingService extends ChangeNotifier {
             debugPrint('Location listener skipped: $error');
           },
         );
+
+    _freshnessTimer ??= Timer.periodic(_freshnessTickInterval, (_) {
+      _refreshFreshnessState();
+    });
   }
 
   void _keepLocalSharingPosition(
@@ -186,6 +193,8 @@ class FirebaseTrackingService extends ChangeNotifier {
     _positionSubscription = null;
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
+    _freshnessTimer?.cancel();
+    _freshnessTimer = null;
     _lastPosition = null;
     _lastMeaningfulMovementPosition = null;
     _lastMeaningfulMovementAt = null;
@@ -547,6 +556,36 @@ class FirebaseTrackingService extends ChangeNotifier {
     return _userSpeedsKmh[userId];
   }
 
+  DateTime? getLocationUpdatedAt(String userId) {
+    _ensureListening();
+    return _userLocationUpdatedAt[userId];
+  }
+
+  bool isLocationFresh(String userId) {
+    final updatedAt = getLocationUpdatedAt(userId);
+    if (updatedAt == null) return false;
+    return DateTime.now().difference(updatedAt) <= _freshLocationDuration;
+  }
+
+  String locationFreshnessLabel(String userId) {
+    return freshnessLabelFor(getLocationUpdatedAt(userId));
+  }
+
+  String freshnessLabelFor(DateTime? updatedAt) {
+    if (updatedAt == null) return 'Update time unavailable';
+
+    final age = DateTime.now().difference(updatedAt);
+    if (age.inSeconds < 10) return 'Updated just now';
+    if (age.inMinutes < 1) return 'Updated ${age.inSeconds}s ago';
+    if (age.inHours < 1) return 'Updated ${age.inMinutes}m ago';
+    return 'Updated ${age.inHours}h ago';
+  }
+
+  bool isFreshUpdatedAt(DateTime? updatedAt) {
+    if (updatedAt == null) return false;
+    return DateTime.now().difference(updatedAt) <= _freshLocationDuration;
+  }
+
   Future<void> updateLocation(String userId, LatLng newLocation) async {
     _ensureListening();
     _userLocations[userId] = newLocation;
@@ -563,6 +602,33 @@ class FirebaseTrackingService extends ChangeNotifier {
     if (value is Timestamp) return value.toDate();
     if (value is DateTime) return value;
     return null;
+  }
+
+  void _refreshFreshnessState() {
+    final removedExpiredLocations = _dropExpiredLocations();
+    if (_userLocations.isNotEmpty || removedExpiredLocations) {
+      notifyListeners();
+    }
+  }
+
+  bool _dropExpiredLocations() {
+    final staleBefore = DateTime.now().subtract(_staleLocationTimeout);
+    final expiredUserIds = _userLocationUpdatedAt.entries
+        .where((entry) => entry.value.isBefore(staleBefore))
+        .map((entry) => entry.key)
+        .toList();
+
+    if (expiredUserIds.isEmpty) {
+      return false;
+    }
+
+    for (final userId in expiredUserIds) {
+      _userLocations.remove(userId);
+      _userSpeedsKmh.remove(userId);
+      _userLocationUpdatedAt.remove(userId);
+    }
+
+    return true;
   }
 
   @override

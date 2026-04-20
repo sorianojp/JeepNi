@@ -230,7 +230,12 @@ class _StudentDashboardState extends State<StudentDashboard>
                               speedLabel: _speedLabel(
                                 trackingService.getSpeedKmh(driver.key),
                               ),
+                              freshnessLabel: trackingService
+                                  .locationFreshnessLabel(driver.key),
                               isFollowed: driver.key == _followedDriverId,
+                              isFresh: trackingService.isLocationFresh(
+                                driver.key,
+                              ),
                             ),
                           ),
                         ),
@@ -305,38 +310,56 @@ class _StudentDashboardState extends State<StudentDashboard>
 }
 
 class _DriverMapMarker extends StatelessWidget {
-  const _DriverMapMarker({required this.speedLabel, required this.isFollowed});
+  const _DriverMapMarker({
+    required this.speedLabel,
+    required this.freshnessLabel,
+    required this.isFollowed,
+    required this.isFresh,
+  });
 
   final String speedLabel;
+  final String freshnessLabel;
   final bool isFollowed;
+  final bool isFresh;
 
   @override
   Widget build(BuildContext context) {
     final color = isFollowed ? Colors.orange : Colors.green;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.directions_bus, color: color, size: isFollowed ? 46 : 40),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withValues(alpha: 0.35)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            child: Text(
-              speedLabel,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
+    return Opacity(
+      opacity: isFresh ? 1 : 0.58,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.directions_bus, color: color, size: isFollowed ? 46 : 40),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: color.withValues(alpha: 0.35)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              child: Text(
+                speedLabel,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
-        ),
-      ],
+          Text(
+            freshnessLabel.replaceFirst('Updated ', ''),
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -705,6 +728,10 @@ class _DriversBottomSheetState extends State<_DriversBottomSheet> {
                               .getLocation(driverId);
                           final driverSpeedKmh = widget.trackingService
                               .getSpeedKmh(driverId);
+                          final freshnessLabel = widget.trackingService
+                              .locationFreshnessLabel(driverId);
+                          final isFresh = widget.trackingService
+                              .isLocationFresh(driverId);
 
                           return ListTile(
                             dense: true,
@@ -720,7 +747,9 @@ class _DriversBottomSheetState extends State<_DriversBottomSheet> {
                               Icons.directions_bus,
                               color: driverId == widget.followedDriverId
                                   ? Colors.orange
-                                  : Colors.green,
+                                  : isFresh
+                                  ? Colors.green
+                                  : Colors.grey,
                             ),
                             title: Text(
                               widget.trackingService.displayNameFor(driverId),
@@ -728,7 +757,7 @@ class _DriversBottomSheetState extends State<_DriversBottomSheet> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
-                              '${widget.distanceLabel(widget.myLocation, driverLocation)} • ${widget.speedLabel(driverSpeedKmh)}',
+                              '${widget.distanceLabel(widget.myLocation, driverLocation)} • ${widget.speedLabel(driverSpeedKmh)} • $freshnessLabel',
                             ),
                           );
                         },

@@ -46,41 +46,56 @@ class AdminMapScreen extends StatelessWidget {
                 markers: allLocations.entries.map((entry) {
                   final isDriver = trackingService.isDriver(entry.key);
                   final displayName = trackingService.displayNameFor(entry.key);
+                  final isFresh = trackingService.isLocationFresh(entry.key);
+                  final freshnessLabel = trackingService
+                      .locationFreshnessLabel(entry.key)
+                      .replaceFirst('Updated ', '');
 
                   return Marker(
                     point: entry.value,
-                    width: 90,
-                    height: 84,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isDriver
-                              ? Icons.directions_bus
-                              : Icons.person_pin_circle,
-                          color: isDriver ? Colors.green : Colors.blue,
-                          size: isDriver ? 40 : 30,
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
+                    width: 104,
+                    height: 98,
+                    child: Opacity(
+                      opacity: isFresh ? 1 : 0.58,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isDriver
+                                ? Icons.directions_bus
+                                : Icons.person_pin_circle,
+                            color: isDriver ? Colors.green : Colors.blue,
+                            size: isDriver ? 40 : 30,
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                          Text(
+                            freshnessLabel,
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }).toList(),

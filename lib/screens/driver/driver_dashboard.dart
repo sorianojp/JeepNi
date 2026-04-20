@@ -13,17 +13,22 @@ import '../../widgets/map_recenter_button.dart';
 const double _driverOverlayRadius = 18;
 
 class _StudentCluster {
-  _StudentCluster(this.center, this.count);
+  _StudentCluster(this.center, this.count, this.updatedAt);
 
   LatLng center;
   int count;
+  DateTime? updatedAt;
 
-  void add(LatLng point) {
+  void add(LatLng point, DateTime? pointUpdatedAt) {
     center = LatLng(
       ((center.latitude * count) + point.latitude) / (count + 1),
       ((center.longitude * count) + point.longitude) / (count + 1),
     );
     count += 1;
+    if (updatedAt == null ||
+        (pointUpdatedAt != null && pointUpdatedAt.isAfter(updatedAt!))) {
+      updatedAt = pointUpdatedAt;
+    }
   }
 }
 
@@ -83,10 +88,15 @@ class _DriverDashboardState extends State<DriverDashboard>
     return '${(meters / 1000).toStringAsFixed(1)} km away';
   }
 
-  List<_StudentCluster> _clusterStudents(Iterable<LatLng> points) {
+  List<_StudentCluster> _clusterStudents(
+    Iterable<MapEntry<String, LatLng>> students,
+    FirebaseTrackingService trackingService,
+  ) {
     final clusters = <_StudentCluster>[];
 
-    for (final point in points) {
+    for (final student in students) {
+      final point = student.value;
+      final updatedAt = trackingService.getLocationUpdatedAt(student.key);
       _StudentCluster? nearestCluster;
       double? nearestDistance;
 
@@ -106,9 +116,9 @@ class _DriverDashboardState extends State<DriverDashboard>
       }
 
       if (nearestCluster == null) {
-        clusters.add(_StudentCluster(point, 1));
+        clusters.add(_StudentCluster(point, 1, updatedAt));
       } else {
-        nearestCluster.add(point);
+        nearestCluster.add(point, updatedAt);
       }
     }
 
@@ -161,7 +171,8 @@ class _DriverDashboardState extends State<DriverDashboard>
         .where((entry) => trackingService.isStudent(entry.key))
         .toList();
     final studentClusters = _clusterStudents(
-      studentsLocations.map((student) => student.value),
+      studentsLocations,
+      trackingService,
     );
     final mapCenter =
         myLocation ??
@@ -224,8 +235,16 @@ class _DriverDashboardState extends State<DriverDashboard>
                           (cluster) => Marker(
                             point: cluster.center,
                             width: 80,
-                            height: 80,
-                            child: _StudentClusterMarker(count: cluster.count),
+                            height: 92,
+                            child: _StudentClusterMarker(
+                              count: cluster.count,
+                              isFresh: trackingService.isFreshUpdatedAt(
+                                cluster.updatedAt,
+                              ),
+                              freshnessLabel: trackingService.freshnessLabelFor(
+                                cluster.updatedAt,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -268,6 +287,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                 _StudentClustersBottomSheet(
                   clusters: studentClusters,
                   driverLocation: myLocation,
+                  trackingService: trackingService,
                   distanceLabel: _distanceLabel,
                   onTapCluster: (cluster) {
                     _cameraAnimator.animateTo(cluster.center, 16.0);
@@ -376,12 +396,14 @@ class _StudentClustersBottomSheet extends StatefulWidget {
   const _StudentClustersBottomSheet({
     required this.clusters,
     required this.driverLocation,
+    required this.trackingService,
     required this.distanceLabel,
     required this.onTapCluster,
   });
 
   final List<_StudentCluster> clusters;
   final LatLng? driverLocation;
+  final FirebaseTrackingService trackingService;
   final String Function(LatLng? from, LatLng to) distanceLabel;
   final ValueChanged<_StudentCluster> onTapCluster;
 
@@ -534,21 +556,20 @@ class _StudentClustersBottomSheetState
                           final title = cluster.count == 1
                               ? '1 student Waiting'
                               : '${cluster.count} students Waiting';
+                          final isFresh = widget.trackingService
+                              .isFreshUpdatedAt(cluster.updatedAt);
 
                           return ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
                             onTap: () => widget.onTapCluster(cluster),
-                            leading: const Icon(
+                            leading: Icon(
                               Icons.person_pin_circle,
-                              color: Colors.blue,
+                              color: isFresh ? Colors.blue : Colors.grey,
                             ),
                             title: Text(title),
                             subtitle: Text(
-                              widget.distanceLabel(
-                                widget.driverLocation,
-                                cluster.center,
-                              ),
+                              '${widget.distanceLabel(widget.driverLocation, cluster.center)} • ${widget.trackingService.freshnessLabelFor(cluster.updatedAt)}',
                             ),
                           );
                         },
@@ -735,43 +756,81 @@ class _DriverMarker extends StatelessWidget {
 }
 
 class _StudentClusterMarker extends StatelessWidget {
-  const _StudentClusterMarker({required this.count});
+  const _StudentClusterMarker({
+    required this.count,
+    required this.isFresh,
+    required this.freshnessLabel,
+  });
 
   final int count;
+  final bool isFresh;
+  final String freshnessLabel;
 
   @override
   Widget build(BuildContext context) {
     if (count == 1) {
-      return const Icon(Icons.person_pin_circle, color: Colors.blue, size: 30);
-    }
-
-    return Stack(
-      alignment: Alignment.center,
-      clipBehavior: Clip.none,
-      children: [
-        const Icon(Icons.person_pin_circle, color: Colors.blue, size: 42),
-        Positioned(
-          top: -10,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.blue, width: 2),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Text(
-                count.toString(),
-                style: const TextStyle(
-                  color: Colors.blue,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+      return Opacity(
+        opacity: isFresh ? 1 : 0.58,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.person_pin_circle, color: Colors.blue, size: 30),
+            Text(
+              freshnessLabel.replaceFirst('Updated ', ''),
+              style: const TextStyle(
+                color: Colors.black87,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ),
+          ],
         ),
-      ],
+      );
+    }
+
+    return Opacity(
+      opacity: isFresh ? 1 : 0.58,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Icons.person_pin_circle, color: Colors.blue, size: 42),
+              Positioned(
+                top: -10,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.blue, width: 2),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Text(
+                      count.toString(),
+                      style: const TextStyle(
+                        color: Colors.blue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Text(
+            freshnessLabel.replaceFirst('Updated ', ''),
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
