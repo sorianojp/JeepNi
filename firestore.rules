@@ -30,12 +30,49 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(userId)).data.role == 'admin';
     }
 
+    function isStudent(userId) {
+      return userExists(userId)
+        && get(/databases/$(database)/documents/users/$(userId)).data.role == 'student';
+    }
+
+    function isDriver(userId) {
+      return userExists(userId)
+        && get(/databases/$(database)/documents/users/$(userId)).data.role == 'driver';
+    }
+
+    function validLocation(data) {
+      return data.keys().hasOnly([
+          'latitude',
+          'longitude',
+          'accuracyMeters',
+          'speedKmh',
+          'role',
+          'updatedAt'
+        ])
+        && data.keys().hasAll(['latitude', 'longitude', 'role', 'updatedAt'])
+        && data.latitude is number
+        && data.longitude is number
+        && validRole(data.role)
+        && data.updatedAt is timestamp
+        && (!data.keys().hasAny(['accuracyMeters']) || data.accuracyMeters is number)
+        && (!data.keys().hasAny(['speedKmh']) || data.speedKmh is number);
+    }
+
     match /users/{userId} {
-      allow read: if signedIn();
+      allow read: if signedIn()
+        && (
+          isOwnDoc(userId)
+          || isAdmin(request.auth.uid)
+          || (
+            isStudent(request.auth.uid)
+            && resource.data.role == 'driver'
+          )
+        );
 
       allow create: if (
         isOwnDoc(userId)
         && request.resource.data.role == 'student'
+        && request.resource.data.email == request.auth.token.email
         && validProfile(request.resource.data)
       ) || (
         signedIn()
@@ -50,15 +87,28 @@ service cloud.firestore {
         && request.resource.data.role == resource.data.role
         && validRole(request.resource.data.role);
 
-      allow delete: if isOwnDoc(userId);
+      allow delete: if false;
     }
 
     match /locations/{userId} {
-      allow read: if signedIn();
+      allow read: if signedIn()
+        && (
+          isOwnDoc(userId)
+          || isAdmin(request.auth.uid)
+          || (
+            isStudent(request.auth.uid)
+            && resource.data.role == 'driver'
+          )
+          || (
+            isDriver(request.auth.uid)
+            && resource.data.role == 'student'
+          )
+        );
 
       allow create, update: if isOwnDoc(userId)
-        && request.resource.data.latitude is number
-        && request.resource.data.longitude is number;
+        && userExists(userId)
+        && validLocation(request.resource.data)
+        && request.resource.data.role == get(/databases/$(database)/documents/users/$(userId)).data.role;
 
       allow delete: if isOwnDoc(userId);
     }

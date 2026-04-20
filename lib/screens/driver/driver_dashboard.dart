@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +11,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/map_camera_animator.dart';
 import '../../widgets/app_map_tile_layer.dart';
 import '../../widgets/map_recenter_button.dart';
+import '../../widgets/tracking_status_widgets.dart';
 
 const double _driverOverlayRadius = 18;
 
@@ -47,7 +50,9 @@ class _DriverDashboardState extends State<DriverDashboard>
   static const double _offscreenIndicatorBottomInsetFraction = 0.14;
 
   final MapController _mapController = MapController();
+  final ValueNotifier<int> _mapCameraTick = ValueNotifier<int>(0);
   late final MapCameraAnimator _cameraAnimator;
+  Timer? _mapCameraThrottle;
   bool _hasCenteredMap = false;
   LatLng? _lastFollowedLocation;
 
@@ -62,8 +67,19 @@ class _DriverDashboardState extends State<DriverDashboard>
 
   @override
   void dispose() {
+    _mapCameraThrottle?.cancel();
+    _mapCameraTick.dispose();
     _cameraAnimator.dispose();
     super.dispose();
+  }
+
+  void _scheduleMapCameraTick() {
+    if (_mapCameraThrottle?.isActive == true) {
+      return;
+    }
+
+    _mapCameraTick.value++;
+    _mapCameraThrottle = Timer(const Duration(milliseconds: 100), () {});
   }
 
   String _speedLabel(double? speedKmh) {
@@ -86,6 +102,44 @@ class _DriverDashboardState extends State<DriverDashboard>
     }
 
     return '${(meters / 1000).toStringAsFixed(1)} km away';
+  }
+
+  String _trackingStatusLabel({
+    required bool isSharing,
+    required bool isStarting,
+    required LatLng? myLocation,
+    required String? error,
+  }) {
+    if (error != null) return 'Location needs attention';
+    if (isStarting) return 'Starting tracking...';
+    if (isSharing && myLocation != null) return 'Sharing live';
+    if (isSharing) return 'Waiting for GPS fix';
+    return 'Starting tracking...';
+  }
+
+  IconData _trackingStatusIcon({
+    required bool isSharing,
+    required bool isStarting,
+    required LatLng? myLocation,
+    required String? error,
+  }) {
+    if (error != null) return Icons.error_outline;
+    if (isStarting) return Icons.sync;
+    if (isSharing && myLocation != null) return Icons.radio_button_checked;
+    if (isSharing) return Icons.gps_fixed;
+    return Icons.sync;
+  }
+
+  Color _trackingStatusColor({
+    required bool isSharing,
+    required bool isStarting,
+    required LatLng? myLocation,
+    required String? error,
+  }) {
+    if (error != null) return Colors.red;
+    if (isStarting || (isSharing && myLocation == null)) return Colors.orange;
+    if (isSharing && myLocation != null) return Colors.green;
+    return Colors.orange;
   }
 
   List<_StudentCluster> _clusterStudents(
@@ -161,10 +215,36 @@ class _DriverDashboardState extends State<DriverDashboard>
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    trackingService.startSharingLocation(user.id);
+    if (trackingService.locationError == null ||
+        trackingService.isSharingLocation(user.id) ||
+        trackingService.isStartingLocationStream) {
+      trackingService.startSharingLocation(user.id);
+    }
 
     final myLocation = trackingService.getLocation(user.id);
     final speedKmh = trackingService.getSpeedKmh(user.id);
+    final isSharing = trackingService.isSharingLocation(user.id);
+    final isStarting = trackingService.isStartingLocationStream;
+    final locationError = trackingService.locationError;
+    final liveDataStatusMessage = trackingService.liveDataStatusMessage;
+    final statusLabel = _trackingStatusLabel(
+      isSharing: isSharing,
+      isStarting: isStarting,
+      myLocation: myLocation,
+      error: locationError,
+    );
+    final statusIcon = _trackingStatusIcon(
+      isSharing: isSharing,
+      isStarting: isStarting,
+      myLocation: myLocation,
+      error: locationError,
+    );
+    final statusColor = _trackingStatusColor(
+      isSharing: isSharing,
+      isStarting: isStarting,
+      myLocation: myLocation,
+      error: locationError,
+    );
     final allLocations = trackingService.getAllLocations();
 
     final studentsLocations = allLocations.entries
@@ -203,7 +283,48 @@ class _DriverDashboardState extends State<DriverDashboard>
         ],
       ),
       body: mapCenter == null
-          ? const Center(child: Text('Waiting for live location...'))
+          ? Stack(
+              children: [
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Text(
+                      locationError == null
+                          ? 'Waiting for your GPS location...'
+                          : 'Location access needs attention before live tracking can start.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  top: 12,
+                  child: _DriverMapControls(
+                    driverName: user.name,
+                    speedLabel: _speedLabel(speedKmh),
+                    statusLabel: statusLabel,
+                    statusIcon: statusIcon,
+                    statusColor: statusColor,
+                  ),
+                ),
+                if (locationError != null)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    top: 100,
+                    child: TrackingErrorBanner(
+                      message: locationError,
+                      onRetry: () =>
+                          trackingService.startSharingLocation(user.id),
+                      onOpenAppSettings: trackingService.openAppSettings,
+                      onOpenLocationSettings:
+                          trackingService.openLocationSettings,
+                    ),
+                  ),
+              ],
+            )
           : Stack(
               children: [
                 FlutterMap(
@@ -211,11 +332,8 @@ class _DriverDashboardState extends State<DriverDashboard>
                   options: MapOptions(
                     initialCenter: mapCenter,
                     initialZoom: 14.0,
-                    onPositionChanged: (camera, hasGesture) {
-                      if (mounted) {
-                        setState(() {});
-                      }
-                    },
+                    onPositionChanged: (camera, hasGesture) =>
+                        _scheduleMapCameraTick(),
                   ),
                   children: [
                     ColoredBox(color: Colors.grey.shade200),
@@ -254,6 +372,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                 _OffscreenStudentIndicators(
                   clusters: studentClusters,
                   mapController: _mapController,
+                  cameraListenable: _mapCameraTick,
                   padding: _offscreenIndicatorPadding,
                   bottomInsetFraction: _offscreenIndicatorBottomInsetFraction,
                   onTapCluster: (cluster) {
@@ -273,6 +392,9 @@ class _DriverDashboardState extends State<DriverDashboard>
                   child: _DriverMapControls(
                     driverName: user.name,
                     speedLabel: _speedLabel(speedKmh),
+                    statusLabel: statusLabel,
+                    statusIcon: statusIcon,
+                    statusColor: statusColor,
                   ),
                 ),
                 if (trackingService.locationError != null)
@@ -280,14 +402,20 @@ class _DriverDashboardState extends State<DriverDashboard>
                     left: 12,
                     right: 12,
                     top: 86,
-                    child: _DriverMapErrorBanner(
+                    child: TrackingErrorBanner(
                       message: trackingService.locationError!,
+                      onRetry: () =>
+                          trackingService.startSharingLocation(user.id),
+                      onOpenAppSettings: trackingService.openAppSettings,
+                      onOpenLocationSettings:
+                          trackingService.openLocationSettings,
                     ),
                   ),
                 _StudentClustersBottomSheet(
                   clusters: studentClusters,
                   driverLocation: myLocation,
                   trackingService: trackingService,
+                  liveDataStatusMessage: liveDataStatusMessage,
                   distanceLabel: _distanceLabel,
                   onTapCluster: (cluster) {
                     _cameraAnimator.animateTo(cluster.center, 16.0);
@@ -303,10 +431,16 @@ class _DriverMapControls extends StatelessWidget {
   const _DriverMapControls({
     required this.driverName,
     required this.speedLabel,
+    required this.statusLabel,
+    required this.statusIcon,
+    required this.statusColor,
   });
 
   final String driverName;
   final String speedLabel;
+  final String statusLabel;
+  final IconData statusIcon;
+  final Color statusColor;
 
   @override
   Widget build(BuildContext context) {
@@ -329,13 +463,26 @@ class _DriverMapControls extends StatelessWidget {
             const Icon(Icons.directions_bus, color: Colors.green),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                driverName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    driverName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 5),
+                  TrackingStatusPill(
+                    label: statusLabel,
+                    icon: statusIcon,
+                    color: statusColor,
+                  ),
+                ],
               ),
             ),
+            const SizedBox(width: 8),
             DecoratedBox(
               decoration: BoxDecoration(
                 color: Colors.green.shade50,
@@ -367,36 +514,12 @@ class _DriverMapControls extends StatelessWidget {
   }
 }
 
-class _DriverMapErrorBanner extends StatelessWidget {
-  const _DriverMapErrorBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.red.shade50.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.red.shade100),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Text(
-          message,
-          style: TextStyle(color: Colors.red.shade800),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-}
-
 class _StudentClustersBottomSheet extends StatefulWidget {
   const _StudentClustersBottomSheet({
     required this.clusters,
     required this.driverLocation,
     required this.trackingService,
+    required this.liveDataStatusMessage,
     required this.distanceLabel,
     required this.onTapCluster,
   });
@@ -404,6 +527,7 @@ class _StudentClustersBottomSheet extends StatefulWidget {
   final List<_StudentCluster> clusters;
   final LatLng? driverLocation;
   final FirebaseTrackingService trackingService;
+  final String? liveDataStatusMessage;
   final String Function(LatLng? from, LatLng to) distanceLabel;
   final ValueChanged<_StudentCluster> onTapCluster;
 
@@ -506,9 +630,12 @@ class _StudentClustersBottomSheetState
                                 ),
                               ),
                               Text(
-                                _isExpanded
-                                    ? 'Tap to collapse'
-                                    : 'Tap to expand',
+                                widget.liveDataStatusMessage ??
+                                    (_isExpanded
+                                        ? 'Tap to collapse'
+                                        : 'Tap to expand'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: Colors.grey.shade600,
                                   fontSize: 12,
@@ -541,8 +668,14 @@ class _StudentClustersBottomSheetState
                     ? ListView(
                         controller: scrollController,
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        children: const [
-                          Center(child: Text('No students sharing location.')),
+                        children: [
+                          Center(
+                            child: Text(
+                              widget.liveDataStatusMessage ??
+                                  'No students sharing location.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         ],
                       )
                     : ListView.separated(
@@ -587,6 +720,7 @@ class _OffscreenStudentIndicators extends StatelessWidget {
   const _OffscreenStudentIndicators({
     required this.clusters,
     required this.mapController,
+    required this.cameraListenable,
     required this.padding,
     required this.bottomInsetFraction,
     required this.onTapCluster,
@@ -594,6 +728,7 @@ class _OffscreenStudentIndicators extends StatelessWidget {
 
   final List<_StudentCluster> clusters;
   final MapController mapController;
+  final Listenable cameraListenable;
   final double padding;
   final double bottomInsetFraction;
   final ValueChanged<_StudentCluster> onTapCluster;
@@ -604,47 +739,53 @@ class _OffscreenStudentIndicators extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
-          return const SizedBox.shrink();
-        }
+    return AnimatedBuilder(
+      animation: cameraListenable,
+      builder: (context, child) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
+              return const SizedBox.shrink();
+            }
 
-        final camera = mapController.camera;
-        final bounds = camera.visibleBounds;
-        final width = constraints.maxWidth;
-        final height = constraints.maxHeight;
-        final bottomLimit = height - (height * bottomInsetFraction) - padding;
-        final indicators = <Widget>[];
+            final camera = mapController.camera;
+            final bounds = camera.visibleBounds;
+            final width = constraints.maxWidth;
+            final height = constraints.maxHeight;
+            final bottomLimit =
+                height - (height * bottomInsetFraction) - padding;
+            final indicators = <Widget>[];
 
-        for (final cluster in clusters) {
-          if (bounds.contains(cluster.center)) {
-            continue;
-          }
+            for (final cluster in clusters) {
+              if (bounds.contains(cluster.center)) {
+                continue;
+              }
 
-          final screenOffset = camera.latLngToScreenOffset(cluster.center);
-          final x = screenOffset.dx.clamp(padding, width - padding);
-          final y = screenOffset.dy.clamp(padding, bottomLimit);
+              final screenOffset = camera.latLngToScreenOffset(cluster.center);
+              final x = screenOffset.dx.clamp(padding, width - padding);
+              final y = screenOffset.dy.clamp(padding, bottomLimit);
 
-          indicators.add(
-            Positioned(
-              left: x - 22,
-              top: y - 22,
-              child: _OffscreenStudentIndicator(
-                count: cluster.count,
-                onTap: () => onTapCluster(cluster),
-              ),
-            ),
-          );
-        }
+              indicators.add(
+                Positioned(
+                  left: x - 22,
+                  top: y - 22,
+                  child: _OffscreenStudentIndicator(
+                    count: cluster.count,
+                    onTap: () => onTapCluster(cluster),
+                  ),
+                ),
+              );
+            }
 
-        if (indicators.isEmpty) {
-          return const SizedBox.shrink();
-        }
+            if (indicators.isEmpty) {
+              return const SizedBox.shrink();
+            }
 
-        return IgnorePointer(
-          ignoring: false,
-          child: Stack(children: indicators),
+            return IgnorePointer(
+              ignoring: false,
+              child: Stack(children: indicators),
+            );
+          },
         );
       },
     );

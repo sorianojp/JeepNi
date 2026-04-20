@@ -7,13 +7,16 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 class FirebaseTrackingService extends ChangeNotifier {
-  static const Duration _heartbeatInterval = Duration(seconds: 5);
   static const Duration _freshnessTickInterval = Duration(seconds: 15);
-  static const Duration _liveUpdateInterval = Duration(seconds: 2);
   static const Duration _currentLocationTimeout = Duration(seconds: 12);
   static const Duration _staleLocationTimeout = Duration(minutes: 3);
   static const Duration _freshLocationDuration = Duration(seconds: 60);
-  static const int _liveDistanceFilterMeters = 1;
+  static const Duration _driverHeartbeatInterval = Duration(seconds: 10);
+  static const Duration _studentHeartbeatInterval = Duration(seconds: 30);
+  static const Duration _driverLiveUpdateInterval = Duration(seconds: 2);
+  static const Duration _studentLiveUpdateInterval = Duration(seconds: 10);
+  static const int _driverDistanceFilterMeters = 2;
+  static const int _studentDistanceFilterMeters = 10;
   static const double _minimumMovingSpeedKmh = 1;
   static const double _maximumPlausibleSpeedKmh = 180;
   static const double _speedSmoothingFactor = 0.45;
@@ -24,11 +27,21 @@ class FirebaseTrackingService extends ChangeNotifier {
   final Map<String, String> _userNames = <String, String>{};
   final Map<String, double> _userSpeedsKmh = <String, double>{};
   final Map<String, DateTime> _userLocationUpdatedAt = <String, DateTime>{};
+  final Map<String, String> _userRoles = <String, String>{};
+  final Map<String, _TrackedLocation> _visibleLocationCache =
+      <String, _TrackedLocation>{};
+  _TrackedLocation? _ownLocationCache;
   final Set<String> _driverIds = <String>{};
   final Set<String> _studentIds = <String>{};
 
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _usersSubscription;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _ownUserSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+  _visibleUsersSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _ownLocationSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+  _visibleLocationsSubscription;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<fb.User?>? _authSubscription;
   Timer? _heartbeatTimer;
@@ -37,15 +50,59 @@ class FirebaseTrackingService extends ChangeNotifier {
   Position? _lastMeaningfulMovementPosition;
   DateTime? _lastMeaningfulMovementAt;
   String? _sharingUserId;
+  String? _listeningUserId;
+  String? _listeningUserRole;
   bool _isStartingLocationStream = false;
   bool _isRefreshingCurrentPosition = false;
+  bool _hasLoadedVisibleUsers = false;
+  bool _hasLoadedVisibleLocations = false;
+  bool _isUsingCachedVisibleUsers = false;
+  bool _isUsingCachedVisibleLocations = false;
   String? _locationError;
+  String? _dataConnectionError;
 
   String? get locationError => _locationError;
+  String? get dataConnectionError => _dataConnectionError;
   bool get isStartingLocationStream => _isStartingLocationStream;
+  bool get isLoadingVisibleData {
+    _ensureListening();
+    final role = _listeningUserRole;
+    if (role == null) return true;
+
+    final needsVisibleUsers = role == 'student' || role == 'admin';
+    final usersLoaded = !needsVisibleUsers || _hasLoadedVisibleUsers;
+    return !usersLoaded || !_hasLoadedVisibleLocations;
+  }
+
+  bool get isUsingCachedData {
+    _ensureListening();
+    return _isUsingCachedVisibleUsers || _isUsingCachedVisibleLocations;
+  }
+
+  String? get liveDataStatusMessage {
+    _ensureListening();
+    if (_dataConnectionError != null) {
+      return _dataConnectionError;
+    }
+    if (isLoadingVisibleData) {
+      return 'Loading live data...';
+    }
+    if (isUsingCachedData) {
+      return 'Showing cached data. Check your internet if it does not update.';
+    }
+    return null;
+  }
 
   bool isSharingLocation(String userId) {
     return _positionSubscription != null && _sharingUserId == userId;
+  }
+
+  Future<void> openAppSettings() async {
+    await Geolocator.openAppSettings();
+  }
+
+  Future<void> openLocationSettings() async {
+    await Geolocator.openLocationSettings();
   }
 
   FirebaseTrackingService() {
@@ -59,136 +116,339 @@ class FirebaseTrackingService extends ChangeNotifier {
   }
 
   void _ensureListening() {
-    if (fb.FirebaseAuth.instance.currentUser == null) {
+    final authUser = fb.FirebaseAuth.instance.currentUser;
+    if (authUser == null) {
       return;
     }
 
-    _usersSubscription ??= FirebaseFirestore.instance
-        .collection('users')
-        .snapshots()
-        .listen(
-          (snapshot) {
-            final nextDriverIds = <String>{};
-            final nextStudentIds = <String>{};
-            final nextUserNames = <String, String>{};
+    if (_listeningUserId == authUser.uid) {
+      return;
+    }
 
-            for (final doc in snapshot.docs) {
-              final data = doc.data();
-              final role = data['role']?.toString().toLowerCase();
-              final name = data['name']?.toString().trim();
-              final email = data['email']?.toString().trim();
-              nextUserNames[doc.id] = name?.isNotEmpty == true
-                  ? name!
-                  : email?.isNotEmpty == true
-                  ? email!
-                  : doc.id;
-
-              if (role == 'driver') {
-                nextDriverIds.add(doc.id);
-              } else if (role == 'student') {
-                nextStudentIds.add(doc.id);
-              }
-            }
-
-            _driverIds
-              ..clear()
-              ..addAll(nextDriverIds);
-            _studentIds
-              ..clear()
-              ..addAll(nextStudentIds);
-            _userNames
-              ..clear()
-              ..addAll(nextUserNames);
-            notifyListeners();
-          },
-          onError: (Object error) {
-            debugPrint('Driver listener skipped: $error');
-          },
-        );
-
-    _subscription ??= FirebaseFirestore.instance
-        .collection('locations')
-        .snapshots()
-        .listen(
-          (snapshot) {
-            final nextLocations = <String, LatLng>{};
-            final nextSpeedsKmh = <String, double>{};
-            final nextUpdatedAt = <String, DateTime>{};
-            final staleBefore = DateTime.now().subtract(_staleLocationTimeout);
-
-            for (final doc in snapshot.docs) {
-              final data = doc.data();
-              final latitude = data['latitude'];
-              final longitude = data['longitude'];
-              final updatedAt = _updatedAtFromValue(data['updatedAt']);
-              if (updatedAt == null || updatedAt.isBefore(staleBefore)) {
-                continue;
-              }
-
-              if (latitude is num && longitude is num) {
-                nextLocations[doc.id] = LatLng(
-                  latitude.toDouble(),
-                  longitude.toDouble(),
-                );
-                nextUpdatedAt[doc.id] = updatedAt;
-                final speedKmh = data['speedKmh'];
-                if (speedKmh is num) {
-                  nextSpeedsKmh[doc.id] = speedKmh.toDouble();
-                }
-              }
-            }
-
-            _keepLocalSharingPosition(
-              nextLocations,
-              nextSpeedsKmh,
-              nextUpdatedAt,
-            );
-
-            _userLocations
-              ..clear()
-              ..addAll(nextLocations);
-            _userSpeedsKmh
-              ..clear()
-              ..addAll(nextSpeedsKmh);
-            _userLocationUpdatedAt
-              ..clear()
-              ..addAll(nextUpdatedAt);
-            notifyListeners();
-          },
-          onError: (Object error) {
-            debugPrint('Location listener skipped: $error');
-          },
-        );
+    _stopListening();
+    _listeningUserId = authUser.uid;
+    _startOwnUserListener(authUser.uid);
+    _startOwnLocationListener(authUser.uid);
 
     _freshnessTimer ??= Timer.periodic(_freshnessTickInterval, (_) {
       _refreshFreshnessState();
     });
   }
 
-  void _keepLocalSharingPosition(
-    Map<String, LatLng> nextLocations,
-    Map<String, double> nextSpeedsKmh,
-    Map<String, DateTime> nextUpdatedAt,
-  ) {
-    final sharingUserId = _sharingUserId;
-    final lastPosition = _lastPosition;
-    if (sharingUserId == null || lastPosition == null) {
+  void _startOwnUserListener(String userId) {
+    _ownUserSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            final data = snapshot.data();
+            final role = _roleFromData(data);
+            _applyUserProfile(snapshot.id, data, fallbackRole: role);
+
+            if (_listeningUserRole != role) {
+              _listeningUserRole = role;
+              _startRoleScopedListeners(role);
+            }
+
+            _rebuildUserIndexes();
+            notifyListeners();
+          },
+          onError: (Object error) {
+            debugPrint('Own user listener skipped: $error');
+          },
+        );
+  }
+
+  void _startRoleScopedListeners(String role) {
+    _visibleUsersSubscription?.cancel();
+    _visibleUsersSubscription = null;
+    _visibleLocationsSubscription?.cancel();
+    _visibleLocationsSubscription = null;
+    _visibleLocationCache.clear();
+    _hasLoadedVisibleUsers = false;
+    _hasLoadedVisibleLocations = false;
+    _isUsingCachedVisibleUsers = false;
+    _isUsingCachedVisibleLocations = false;
+    _dataConnectionError = null;
+
+    final firestore = FirebaseFirestore.instance;
+
+    if (role == 'admin') {
+      _visibleUsersSubscription = firestore
+          .collection('users')
+          .snapshots(includeMetadataChanges: true)
+          .listen(
+            _handleVisibleUsersSnapshot,
+            onError: (Object error) {
+              _handleDataConnectionError('User listener skipped', error);
+            },
+          );
+      _visibleLocationsSubscription = firestore
+          .collection('locations')
+          .snapshots(includeMetadataChanges: true)
+          .listen(
+            _handleVisibleLocationsSnapshot,
+            onError: (Object error) {
+              _handleDataConnectionError('Location listener skipped', error);
+            },
+          );
       return;
     }
 
-    nextLocations[sharingUserId] = LatLng(
-      lastPosition.latitude,
-      lastPosition.longitude,
+    if (role == 'student') {
+      _visibleUsersSubscription = firestore
+          .collection('users')
+          .where('role', isEqualTo: 'driver')
+          .snapshots(includeMetadataChanges: true)
+          .listen(
+            _handleVisibleUsersSnapshot,
+            onError: (Object error) {
+              _handleDataConnectionError(
+                'Driver profile listener skipped',
+                error,
+              );
+            },
+          );
+      _visibleLocationsSubscription = firestore
+          .collection('locations')
+          .where('role', isEqualTo: 'driver')
+          .snapshots(includeMetadataChanges: true)
+          .listen(
+            _handleVisibleLocationsSnapshot,
+            onError: (Object error) {
+              _handleDataConnectionError(
+                'Driver location listener skipped',
+                error,
+              );
+            },
+          );
+      return;
+    }
+
+    if (role == 'driver') {
+      _visibleLocationsSubscription = firestore
+          .collection('locations')
+          .where('role', isEqualTo: 'student')
+          .snapshots(includeMetadataChanges: true)
+          .listen(
+            _handleVisibleLocationsSnapshot,
+            onError: (Object error) {
+              _handleDataConnectionError(
+                'Student location listener skipped',
+                error,
+              );
+            },
+          );
+    }
+  }
+
+  void _startOwnLocationListener(String userId) {
+    _ownLocationSubscription = FirebaseFirestore.instance
+        .collection('locations')
+        .doc(userId)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            _ownLocationCache = _trackedLocationFromDoc(snapshot);
+            _rebuildLocationsFromCaches();
+            notifyListeners();
+          },
+          onError: (Object error) {
+            debugPrint('Own location listener skipped: $error');
+          },
+        );
+  }
+
+  void _handleVisibleUsersSnapshot(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+  ) {
+    _hasLoadedVisibleUsers = true;
+    _isUsingCachedVisibleUsers = snapshot.metadata.isFromCache;
+    _dataConnectionError = null;
+    final nextUserNames = <String, String>{};
+    final nextUserRoles = <String, String>{};
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final role = _roleFromData(data);
+      nextUserNames[doc.id] = _displayNameFromData(doc.id, data);
+      nextUserRoles[doc.id] = role;
+    }
+
+    final ownUserId = _listeningUserId;
+    final ownName = ownUserId == null ? null : _userNames[ownUserId];
+    final ownRole = ownUserId == null ? null : _userRoles[ownUserId];
+
+    _userNames
+      ..clear()
+      ..addAll(nextUserNames);
+    _userRoles
+      ..clear()
+      ..addAll(nextUserRoles);
+
+    if (ownUserId != null) {
+      if (ownName != null) _userNames[ownUserId] = ownName;
+      if (ownRole != null) _userRoles[ownUserId] = ownRole;
+    }
+
+    _rebuildUserIndexes();
+    notifyListeners();
+  }
+
+  void _handleVisibleLocationsSnapshot(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+  ) {
+    _hasLoadedVisibleLocations = true;
+    _isUsingCachedVisibleLocations = snapshot.metadata.isFromCache;
+    _dataConnectionError = null;
+    final nextLocations = <String, _TrackedLocation>{};
+
+    for (final doc in snapshot.docs) {
+      final trackedLocation = _trackedLocationFromDoc(doc);
+      if (trackedLocation != null) {
+        nextLocations[doc.id] = trackedLocation;
+      }
+    }
+
+    _visibleLocationCache
+      ..clear()
+      ..addAll(nextLocations);
+    _rebuildLocationsFromCaches();
+    notifyListeners();
+  }
+
+  void _handleDataConnectionError(String label, Object error) {
+    debugPrint('$label: $error');
+    _dataConnectionError =
+        'Could not load live data. Check your internet connection.';
+    notifyListeners();
+  }
+
+  void _applyUserProfile(
+    String userId,
+    Map<String, dynamic>? data, {
+    required String fallbackRole,
+  }) {
+    _userNames[userId] = _displayNameFromData(userId, data);
+    _userRoles[userId] = _roleFromData(data, fallbackRole: fallbackRole);
+  }
+
+  void _rebuildUserIndexes() {
+    _driverIds.clear();
+    _studentIds.clear();
+
+    for (final entry in _userRoles.entries) {
+      if (entry.value == 'driver') {
+        _driverIds.add(entry.key);
+      } else if (entry.value == 'student') {
+        _studentIds.add(entry.key);
+      }
+    }
+
+    for (final entry in _visibleLocationCache.entries) {
+      if (entry.value.role == 'driver') {
+        _driverIds.add(entry.key);
+      } else if (entry.value.role == 'student') {
+        _studentIds.add(entry.key);
+      }
+    }
+
+    final ownUserId = _listeningUserId;
+    final ownLocation = _ownLocationCache;
+    if (ownUserId != null && ownLocation != null) {
+      if (ownLocation.role == 'driver') {
+        _driverIds.add(ownUserId);
+      } else if (ownLocation.role == 'student') {
+        _studentIds.add(ownUserId);
+      }
+    }
+  }
+
+  void _rebuildLocationsFromCaches() {
+    _userLocations.clear();
+    _userSpeedsKmh.clear();
+    _userLocationUpdatedAt.clear();
+
+    for (final entry in _visibleLocationCache.entries) {
+      _applyTrackedLocation(entry.key, entry.value);
+    }
+
+    final ownUserId = _listeningUserId;
+    final ownLocation = _ownLocationCache;
+    if (ownUserId != null && ownLocation != null) {
+      _applyTrackedLocation(ownUserId, ownLocation);
+    }
+
+    _rebuildUserIndexes();
+  }
+
+  void _applyTrackedLocation(String userId, _TrackedLocation trackedLocation) {
+    _userLocations[userId] = trackedLocation.location;
+    if (trackedLocation.speedKmh != null) {
+      _userSpeedsKmh[userId] = trackedLocation.speedKmh!;
+    }
+    _userLocationUpdatedAt[userId] = trackedLocation.updatedAt;
+    _userRoles[userId] = trackedLocation.role;
+  }
+
+  _TrackedLocation? _trackedLocationFromDoc(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    if (data == null) return null;
+
+    final latitude = data['latitude'];
+    final longitude = data['longitude'];
+    final updatedAt = _updatedAtFromValue(data['updatedAt']);
+    final role = _roleFromData(data);
+    final staleBefore = DateTime.now().subtract(_staleLocationTimeout);
+    if (latitude is! num ||
+        longitude is! num ||
+        updatedAt == null ||
+        updatedAt.isBefore(staleBefore)) {
+      return null;
+    }
+
+    final speedKmh = data['speedKmh'];
+    return _TrackedLocation(
+      location: LatLng(latitude.toDouble(), longitude.toDouble()),
+      speedKmh: speedKmh is num ? speedKmh.toDouble() : null,
+      updatedAt: updatedAt,
+      role: role,
     );
-    nextSpeedsKmh[sharingUserId] = _userSpeedsKmh[sharingUserId] ?? 0.0;
-    nextUpdatedAt[sharingUserId] = DateTime.now();
+  }
+
+  String _displayNameFromData(String userId, Map<String, dynamic>? data) {
+    final name = data?['name']?.toString().trim();
+    final email = data?['email']?.toString().trim();
+    return name?.isNotEmpty == true
+        ? name!
+        : email?.isNotEmpty == true
+        ? email!
+        : userId;
+  }
+
+  String _roleFromData(
+    Map<String, dynamic>? data, {
+    String fallbackRole = 'student',
+  }) {
+    final role = data?['role']?.toString().toLowerCase();
+    if (role == 'driver' || role == 'admin' || role == 'student') {
+      return role!;
+    }
+    return fallbackRole;
   }
 
   void _stopListening() {
-    _usersSubscription?.cancel();
-    _usersSubscription = null;
-    _subscription?.cancel();
-    _subscription = null;
+    _ownUserSubscription?.cancel();
+    _ownUserSubscription = null;
+    _visibleUsersSubscription?.cancel();
+    _visibleUsersSubscription = null;
+    _ownLocationSubscription?.cancel();
+    _ownLocationSubscription = null;
+    _visibleLocationsSubscription?.cancel();
+    _visibleLocationsSubscription = null;
     _positionSubscription?.cancel();
     _positionSubscription = null;
     _heartbeatTimer?.cancel();
@@ -199,14 +459,24 @@ class FirebaseTrackingService extends ChangeNotifier {
     _lastMeaningfulMovementPosition = null;
     _lastMeaningfulMovementAt = null;
     _sharingUserId = null;
+    _listeningUserId = null;
+    _listeningUserRole = null;
     _isStartingLocationStream = false;
     _isRefreshingCurrentPosition = false;
+    _hasLoadedVisibleUsers = false;
+    _hasLoadedVisibleLocations = false;
+    _isUsingCachedVisibleUsers = false;
+    _isUsingCachedVisibleLocations = false;
+    _dataConnectionError = null;
     _driverIds.clear();
     _studentIds.clear();
     _userNames.clear();
+    _userRoles.clear();
     _userSpeedsKmh.clear();
     _userLocationUpdatedAt.clear();
     _userLocations.clear();
+    _visibleLocationCache.clear();
+    _ownLocationCache = null;
   }
 
   Future<void> startSharingLocation(String userId) async {
@@ -234,6 +504,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     }
 
     _isStartingLocationStream = true;
+    final role = await _roleForUser(userId);
     final hasPermission = await _ensureLocationPermission();
     if (!hasPermission) {
       _isStartingLocationStream = false;
@@ -243,22 +514,22 @@ class FirebaseTrackingService extends ChangeNotifier {
 
     try {
       final currentPosition = await Geolocator.getCurrentPosition(
-        locationSettings: _currentLocationSettings(),
+        locationSettings: _currentLocationSettings(role),
       );
-      await _writePosition(userId, currentPosition);
+      await _writePosition(userId, currentPosition, role: role);
     } catch (error) {
       debugPrint('Current location lookup failed: $error');
       final lastKnown = await Geolocator.getLastKnownPosition();
       if (lastKnown != null) {
-        await _writePosition(userId, lastKnown);
+        await _writePosition(userId, lastKnown, role: role);
       }
     }
 
     _positionSubscription =
         Geolocator.getPositionStream(
-          locationSettings: _streamLocationSettings(),
+          locationSettings: _streamLocationSettings(role),
         ).listen(
-          (position) => _writePosition(userId, position),
+          (position) => _writePosition(userId, position, role: role),
           onError: (Object error) {
             _locationError = error.toString();
             debugPrint('Location stream failed: $error');
@@ -267,7 +538,7 @@ class FirebaseTrackingService extends ChangeNotifier {
         );
     _sharingUserId = userId;
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
+    _heartbeatTimer = Timer.periodic(_heartbeatIntervalForRole(role), (_) {
       _refreshCurrentPosition(userId);
     });
     _isStartingLocationStream = false;
@@ -295,6 +566,10 @@ class FirebaseTrackingService extends ChangeNotifier {
     _userLocations.remove(userId);
     _userSpeedsKmh.remove(userId);
     _userLocationUpdatedAt.remove(userId);
+    _visibleLocationCache.remove(userId);
+    if (_listeningUserId == userId) {
+      _ownLocationCache = null;
+    }
     await FirebaseFirestore.instance
         .collection('locations')
         .doc(userId)
@@ -335,24 +610,29 @@ class FirebaseTrackingService extends ChangeNotifier {
     return true;
   }
 
-  LocationSettings _currentLocationSettings() {
-    return _locationSettings(timeLimit: _currentLocationTimeout);
+  LocationSettings _currentLocationSettings(String role) {
+    return _locationSettings(role: role, timeLimit: _currentLocationTimeout);
   }
 
-  LocationSettings _streamLocationSettings() {
-    return _locationSettings(useForegroundService: true);
+  LocationSettings _streamLocationSettings(String role) {
+    return _locationSettings(role: role, useForegroundService: true);
   }
 
   LocationSettings _locationSettings({
+    required String role,
     Duration? timeLimit,
     bool useForegroundService = false,
   }) {
+    final accuracy = _accuracyForRole(role);
+    final distanceFilter = _distanceFilterForRole(role);
+    final intervalDuration = _liveUpdateIntervalForRole(role);
+
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return AndroidSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-          distanceFilter: _liveDistanceFilterMeters,
-          intervalDuration: _liveUpdateInterval,
+          accuracy: accuracy,
+          distanceFilter: distanceFilter,
+          intervalDuration: intervalDuration,
           timeLimit: timeLimit,
           foregroundNotificationConfig: useForegroundService
               ? const ForegroundNotificationConfig(
@@ -367,9 +647,9 @@ class FirebaseTrackingService extends ChangeNotifier {
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:
         return AppleSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
+          accuracy: accuracy,
           activityType: ActivityType.automotiveNavigation,
-          distanceFilter: _liveDistanceFilterMeters,
+          distanceFilter: distanceFilter,
           pauseLocationUpdatesAutomatically: false,
           allowBackgroundLocationUpdates: false,
           timeLimit: timeLimit,
@@ -378,11 +658,35 @@ class FirebaseTrackingService extends ChangeNotifier {
       case TargetPlatform.linux:
       case TargetPlatform.windows:
         return LocationSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-          distanceFilter: _liveDistanceFilterMeters,
+          accuracy: accuracy,
+          distanceFilter: distanceFilter,
           timeLimit: timeLimit,
         );
     }
+  }
+
+  Duration _heartbeatIntervalForRole(String role) {
+    return role == 'driver'
+        ? _driverHeartbeatInterval
+        : _studentHeartbeatInterval;
+  }
+
+  Duration _liveUpdateIntervalForRole(String role) {
+    return role == 'driver'
+        ? _driverLiveUpdateInterval
+        : _studentLiveUpdateInterval;
+  }
+
+  int _distanceFilterForRole(String role) {
+    return role == 'driver'
+        ? _driverDistanceFilterMeters
+        : _studentDistanceFilterMeters;
+  }
+
+  LocationAccuracy _accuracyForRole(String role) {
+    return role == 'driver'
+        ? LocationAccuracy.bestForNavigation
+        : LocationAccuracy.high;
   }
 
   Future<void> _refreshCurrentPosition(String userId) async {
@@ -392,11 +696,12 @@ class FirebaseTrackingService extends ChangeNotifier {
 
     _isRefreshingCurrentPosition = true;
     try {
+      final role = await _roleForUser(userId);
       final currentPosition = await Geolocator.getCurrentPosition(
-        locationSettings: _currentLocationSettings(),
+        locationSettings: _currentLocationSettings(role),
       );
       if (_sharingUserId == userId) {
-        await _writePosition(userId, currentPosition);
+        await _writePosition(userId, currentPosition, role: role);
       }
     } catch (error) {
       final lastPosition = _lastPosition;
@@ -413,8 +718,10 @@ class FirebaseTrackingService extends ChangeNotifier {
   Future<void> _writePosition(
     String userId,
     Position position, {
+    String? role,
     bool forceStopped = false,
   }) async {
+    role ??= await _roleForUser(userId);
     final nextLocation = LatLng(position.latitude, position.longitude);
     final speedKmh = _speedKmhForPosition(
       userId,
@@ -426,11 +733,21 @@ class FirebaseTrackingService extends ChangeNotifier {
     _userLocations[userId] = nextLocation;
     _userSpeedsKmh[userId] = speedKmh;
     _userLocationUpdatedAt[userId] = now;
+    _userRoles[userId] = role;
+    if (_listeningUserId == userId) {
+      _ownLocationCache = _TrackedLocation(
+        location: nextLocation,
+        speedKmh: speedKmh,
+        updatedAt: now,
+        role: role,
+      );
+    }
     await FirebaseFirestore.instance.collection('locations').doc(userId).set({
       'latitude': position.latitude,
       'longitude': position.longitude,
       'accuracyMeters': position.accuracy,
       'speedKmh': speedKmh,
+      'role': role,
       'updatedAt': FieldValue.serverTimestamp(),
     });
     notifyListeners();
@@ -588,14 +905,31 @@ class FirebaseTrackingService extends ChangeNotifier {
 
   Future<void> updateLocation(String userId, LatLng newLocation) async {
     _ensureListening();
+    final role = await _roleForUser(userId);
     _userLocations[userId] = newLocation;
     _userLocationUpdatedAt[userId] = DateTime.now();
     await FirebaseFirestore.instance.collection('locations').doc(userId).set({
       'latitude': newLocation.latitude,
       'longitude': newLocation.longitude,
+      'role': role,
       'updatedAt': FieldValue.serverTimestamp(),
     });
     notifyListeners();
+  }
+
+  Future<String> _roleForUser(String userId) async {
+    final cachedRole = _userRoles[userId];
+    if (cachedRole != null) {
+      return cachedRole;
+    }
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .get();
+    final role = _roleFromData(snapshot.data());
+    _userRoles[userId] = role;
+    return role;
   }
 
   DateTime? _updatedAtFromValue(Object? value) {
@@ -626,8 +960,13 @@ class FirebaseTrackingService extends ChangeNotifier {
       _userLocations.remove(userId);
       _userSpeedsKmh.remove(userId);
       _userLocationUpdatedAt.remove(userId);
+      _visibleLocationCache.remove(userId);
+      if (_listeningUserId == userId) {
+        _ownLocationCache = null;
+      }
     }
 
+    _rebuildUserIndexes();
     return true;
   }
 
@@ -638,4 +977,18 @@ class FirebaseTrackingService extends ChangeNotifier {
     _stopListening();
     super.dispose();
   }
+}
+
+class _TrackedLocation {
+  const _TrackedLocation({
+    required this.location,
+    required this.updatedAt,
+    required this.role,
+    this.speedKmh,
+  });
+
+  final LatLng location;
+  final double? speedKmh;
+  final DateTime updatedAt;
+  final String role;
 }
