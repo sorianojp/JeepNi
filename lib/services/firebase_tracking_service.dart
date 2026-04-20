@@ -26,6 +26,7 @@ class FirebaseTrackingService extends ChangeNotifier {
   final Map<String, LatLng> _userLocations = <String, LatLng>{};
   final Map<String, String> _userNames = <String, String>{};
   final Map<String, double> _userSpeedsKmh = <String, double>{};
+  final Map<String, double> _userAccuraciesMeters = <String, double>{};
   final Map<String, DateTime> _userLocationUpdatedAt = <String, DateTime>{};
   final Map<String, String> _userRoles = <String, String>{};
   final Map<String, _TrackedLocation> _visibleLocationCache =
@@ -368,6 +369,7 @@ class FirebaseTrackingService extends ChangeNotifier {
   void _rebuildLocationsFromCaches() {
     _userLocations.clear();
     _userSpeedsKmh.clear();
+    _userAccuraciesMeters.clear();
     _userLocationUpdatedAt.clear();
 
     for (final entry in _visibleLocationCache.entries) {
@@ -387,6 +389,11 @@ class FirebaseTrackingService extends ChangeNotifier {
     _userLocations[userId] = trackedLocation.location;
     if (trackedLocation.speedKmh != null) {
       _userSpeedsKmh[userId] = trackedLocation.speedKmh!;
+    }
+    if (trackedLocation.accuracyMeters != null) {
+      _userAccuraciesMeters[userId] = trackedLocation.accuracyMeters!;
+    } else {
+      _userAccuraciesMeters.remove(userId);
     }
     _userLocationUpdatedAt[userId] = trackedLocation.updatedAt;
     _userRoles[userId] = trackedLocation.role;
@@ -411,9 +418,11 @@ class FirebaseTrackingService extends ChangeNotifier {
     }
 
     final speedKmh = data['speedKmh'];
+    final accuracyMeters = data['accuracyMeters'];
     return _TrackedLocation(
       location: LatLng(latitude.toDouble(), longitude.toDouble()),
       speedKmh: speedKmh is num ? speedKmh.toDouble() : null,
+      accuracyMeters: accuracyMeters is num ? accuracyMeters.toDouble() : null,
       updatedAt: updatedAt,
       role: role,
     );
@@ -473,6 +482,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     _userNames.clear();
     _userRoles.clear();
     _userSpeedsKmh.clear();
+    _userAccuraciesMeters.clear();
     _userLocationUpdatedAt.clear();
     _userLocations.clear();
     _visibleLocationCache.clear();
@@ -565,6 +575,7 @@ class FirebaseTrackingService extends ChangeNotifier {
 
     _userLocations.remove(userId);
     _userSpeedsKmh.remove(userId);
+    _userAccuraciesMeters.remove(userId);
     _userLocationUpdatedAt.remove(userId);
     _visibleLocationCache.remove(userId);
     if (_listeningUserId == userId) {
@@ -732,12 +743,14 @@ class FirebaseTrackingService extends ChangeNotifier {
     _lastPosition = position;
     _userLocations[userId] = nextLocation;
     _userSpeedsKmh[userId] = speedKmh;
+    _userAccuraciesMeters[userId] = position.accuracy;
     _userLocationUpdatedAt[userId] = now;
     _userRoles[userId] = role;
     if (_listeningUserId == userId) {
       _ownLocationCache = _TrackedLocation(
         location: nextLocation,
         speedKmh: speedKmh,
+        accuracyMeters: position.accuracy,
         updatedAt: now,
         role: role,
       );
@@ -873,6 +886,11 @@ class FirebaseTrackingService extends ChangeNotifier {
     return _userSpeedsKmh[userId];
   }
 
+  double? getAccuracyMeters(String userId) {
+    _ensureListening();
+    return _userAccuraciesMeters[userId];
+  }
+
   DateTime? getLocationUpdatedAt(String userId) {
     _ensureListening();
     return _userLocationUpdatedAt[userId];
@@ -907,6 +925,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     _ensureListening();
     final role = await _roleForUser(userId);
     _userLocations[userId] = newLocation;
+    _userAccuraciesMeters.remove(userId);
     _userLocationUpdatedAt[userId] = DateTime.now();
     await FirebaseFirestore.instance.collection('locations').doc(userId).set({
       'latitude': newLocation.latitude,
@@ -959,6 +978,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     for (final userId in expiredUserIds) {
       _userLocations.remove(userId);
       _userSpeedsKmh.remove(userId);
+      _userAccuraciesMeters.remove(userId);
       _userLocationUpdatedAt.remove(userId);
       _visibleLocationCache.remove(userId);
       if (_listeningUserId == userId) {
@@ -985,10 +1005,12 @@ class _TrackedLocation {
     required this.updatedAt,
     required this.role,
     this.speedKmh,
+    this.accuracyMeters,
   });
 
   final LatLng location;
   final double? speedKmh;
+  final double? accuracyMeters;
   final DateTime updatedAt;
   final String role;
 }

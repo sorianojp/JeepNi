@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/firebase_auth_service.dart';
@@ -11,6 +12,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/map_camera_animator.dart';
 import '../../widgets/app_map_tile_layer.dart';
 import '../../widgets/map_recenter_button.dart';
+import '../../widgets/tracking_diagnostics_sheet.dart';
 import '../../widgets/tracking_status_widgets.dart';
 
 const double _driverOverlayRadius = 18;
@@ -54,6 +56,7 @@ class _DriverDashboardState extends State<DriverDashboard>
   late final MapCameraAnimator _cameraAnimator;
   Timer? _mapCameraThrottle;
   bool _hasCenteredMap = false;
+  bool _hideLocationOnboarding = false;
   LatLng? _lastFollowedLocation;
 
   @override
@@ -245,6 +248,8 @@ class _DriverDashboardState extends State<DriverDashboard>
       myLocation: myLocation,
       error: locationError,
     );
+    final showLocationOnboarding =
+        !_hideLocationOnboarding && myLocation == null && locationError == null;
     final allLocations = trackingService.getAllLocations();
 
     final studentsLocations = allLocations.entries
@@ -271,6 +276,17 @@ class _DriverDashboardState extends State<DriverDashboard>
         title: const Text('Driver Dashboard'),
         backgroundColor: Colors.green,
         actions: [
+          if (kDebugMode)
+            IconButton(
+              icon: const Icon(Icons.bug_report),
+              tooltip: 'Tracking diagnostics',
+              onPressed: () => showTrackingDiagnosticsSheet(
+                context: context,
+                trackingService: trackingService,
+                userId: user.id,
+                roleLabel: 'Driver',
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
@@ -321,6 +337,27 @@ class _DriverDashboardState extends State<DriverDashboard>
                       onOpenAppSettings: trackingService.openAppSettings,
                       onOpenLocationSettings:
                           trackingService.openLocationSettings,
+                    ),
+                  ),
+                if (showLocationOnboarding)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    top: 100,
+                    child: LocationOnboardingCard(
+                      title: 'Driver tracking starts automatically',
+                      message:
+                          'Keep GPS on while driving so students can see your live jeepney location and speed.',
+                      icon: Icons.directions_bus,
+                      color: Colors.green,
+                      actionLabel: 'Try tracking again',
+                      onAction: () =>
+                          trackingService.startSharingLocation(user.id),
+                      onDismiss: () {
+                        setState(() {
+                          _hideLocationOnboarding = true;
+                        });
+                      },
                     ),
                   ),
               ],
@@ -409,6 +446,27 @@ class _DriverDashboardState extends State<DriverDashboard>
                       onOpenAppSettings: trackingService.openAppSettings,
                       onOpenLocationSettings:
                           trackingService.openLocationSettings,
+                    ),
+                  ),
+                if (showLocationOnboarding)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    top: 86,
+                    child: LocationOnboardingCard(
+                      title: 'Waiting for your live location',
+                      message:
+                          'Keep GPS on and stay outdoors if possible. Students will see you once the first GPS fix is ready.',
+                      icon: Icons.directions_bus,
+                      color: Colors.green,
+                      actionLabel: 'Try tracking again',
+                      onAction: () =>
+                          trackingService.startSharingLocation(user.id),
+                      onDismiss: () {
+                        setState(() {
+                          _hideLocationOnboarding = true;
+                        });
+                      },
                     ),
                   ),
                 _StudentClustersBottomSheet(

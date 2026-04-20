@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/firebase_auth_service.dart';
@@ -11,6 +12,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/map_camera_animator.dart';
 import '../../widgets/app_map_tile_layer.dart';
 import '../../widgets/map_recenter_button.dart';
+import '../../widgets/tracking_diagnostics_sheet.dart';
 import '../../widgets/tracking_status_widgets.dart';
 
 const double _studentOverlayRadius = 18;
@@ -33,6 +35,7 @@ class _StudentDashboardState extends State<StudentDashboard>
   late final MapCameraAnimator _cameraAnimator;
   Timer? _mapCameraThrottle;
   bool _hasCenteredMap = false;
+  bool _hideLocationOnboarding = false;
   String? _followedDriverId;
   LatLng? _lastFollowedDriverLocation;
 
@@ -215,6 +218,8 @@ class _StudentDashboardState extends State<StudentDashboard>
     final followedDriverName = _followedDriverId == null
         ? null
         : trackingService.displayNameFor(_followedDriverId!);
+    final showLocationOnboarding =
+        !_hideLocationOnboarding && !isSharing && locationError == null;
     final mapCenter =
         myLocation ??
         (driverLocations.isEmpty ? null : driverLocations.first.value);
@@ -231,6 +236,17 @@ class _StudentDashboardState extends State<StudentDashboard>
       appBar: AppBar(
         title: const Text('Student Dashboard'),
         actions: [
+          if (kDebugMode)
+            IconButton(
+              icon: const Icon(Icons.bug_report),
+              tooltip: 'Tracking diagnostics',
+              onPressed: () => showTrackingDiagnosticsSheet(
+                context: context,
+                trackingService: trackingService,
+                userId: user.id,
+                roleLabel: 'Student',
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
@@ -289,6 +305,27 @@ class _StudentDashboardState extends State<StudentDashboard>
                       onOpenAppSettings: trackingService.openAppSettings,
                       onOpenLocationSettings:
                           trackingService.openLocationSettings,
+                    ),
+                  ),
+                if (showLocationOnboarding)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    top: 100,
+                    child: LocationOnboardingCard(
+                      title: 'Share only when you need a ride',
+                      message:
+                          'Tap Share so nearby drivers can see your waiting location. Stop sharing removes you from the driver map.',
+                      icon: Icons.person_pin_circle,
+                      color: Colors.blue,
+                      actionLabel: 'Share my location',
+                      onAction: () =>
+                          trackingService.startSharingLocation(user.id),
+                      onDismiss: () {
+                        setState(() {
+                          _hideLocationOnboarding = true;
+                        });
+                      },
                     ),
                   ),
               ],
@@ -421,6 +458,27 @@ class _StudentDashboardState extends State<StudentDashboard>
                       onOpenAppSettings: trackingService.openAppSettings,
                       onOpenLocationSettings:
                           trackingService.openLocationSettings,
+                    ),
+                  ),
+                if (showLocationOnboarding && _followedDriverId == null)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    top: 86,
+                    child: LocationOnboardingCard(
+                      title: 'Share to help drivers find you',
+                      message:
+                          'Drivers only see your location while sharing is on. Your marker disappears when you tap Stop.',
+                      icon: Icons.person_pin_circle,
+                      color: Colors.blue,
+                      actionLabel: 'Share my location',
+                      onAction: () =>
+                          trackingService.startSharingLocation(user.id),
+                      onDismiss: () {
+                        setState(() {
+                          _hideLocationOnboarding = true;
+                        });
+                      },
                     ),
                   ),
                 _DriversBottomSheet(
