@@ -251,7 +251,12 @@ class FirebaseTrackingService extends ChangeNotifier {
         .snapshots()
         .listen(
           (snapshot) {
-            _ownLocationCache = _trackedLocationFromDoc(snapshot);
+            final trackedLocation = _trackedLocationFromDoc(snapshot);
+            if (trackedLocation != null) {
+              _ownLocationCache = trackedLocation;
+            } else if (!snapshot.exists) {
+              _ownLocationCache = null;
+            }
             _rebuildLocationsFromCaches();
             notifyListeners();
           },
