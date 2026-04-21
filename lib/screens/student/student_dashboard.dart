@@ -16,6 +16,8 @@ import '../../widgets/tracking_diagnostics_sheet.dart';
 import '../../widgets/tracking_status_widgets.dart';
 
 const double _studentOverlayRadius = 18;
+const Color _studentThemeColor = Color(0xFF212121);
+const Color _driverThemeColor = Color(0xFF0D47A1);
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -331,7 +333,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                               children: [
                                 const Icon(
                                   Icons.person_pin_circle,
-                                  color: Colors.blue,
+                                  color: _studentThemeColor,
                                   size: 40,
                                 ),
                                 Container(
@@ -387,8 +389,13 @@ class _StudentDashboardState extends State<StudentDashboard>
                 ),
                 MapRecenterButton(
                   enabled: myLocation != null,
-                  color: Colors.blue,
+                  color: _studentThemeColor,
                   heroTag: 'student-recenter-location',
+                  alignment: Alignment.topRight,
+                  padding: EdgeInsets.only(
+                    top: _followedDriverId == null ? 88 : 144,
+                    right: 16,
+                  ),
                   onPressed: () => _recenterToStudentLocation(myLocation),
                 ),
                 Positioned(
@@ -467,7 +474,7 @@ class _DriverMapMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isFollowed ? Colors.orange : Colors.green;
+    final color = isFollowed ? Colors.orange : _driverThemeColor;
 
     return Opacity(
       opacity: isFresh ? 1 : 0.58,
@@ -594,7 +601,7 @@ class _OffscreenDriverIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isFollowed ? Colors.orange : Colors.green;
+    final color = isFollowed ? Colors.orange : _driverThemeColor;
 
     return Material(
       color: Colors.transparent,
@@ -662,7 +669,7 @@ class _StudentMapControls extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            const Icon(Icons.person, color: Colors.blue),
+            const Icon(Icons.person, color: _studentThemeColor),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -686,6 +693,12 @@ class _StudentMapControls extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             FilledButton.icon(
+              style: isSharing
+                  ? FilledButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    )
+                  : null,
               onPressed: isStarting ? null : onToggleSharing,
               icon: isStarting
                   ? const SizedBox(
@@ -904,7 +917,7 @@ class _DriversBottomSheetState extends State<_DriversBottomSheet> {
                               color: driverId == widget.followedDriverId
                                   ? Colors.orange
                                   : isFresh
-                                  ? Colors.green
+                                  ? _driverThemeColor
                                   : Colors.grey,
                             ),
                             title: Text(

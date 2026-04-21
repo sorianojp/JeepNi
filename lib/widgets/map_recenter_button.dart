@@ -7,21 +7,25 @@ class MapRecenterButton extends StatelessWidget {
     required this.color,
     required this.heroTag,
     required this.onPressed,
+    this.alignment = Alignment.bottomRight,
+    this.padding,
   });
 
   final bool enabled;
   final Color color;
   final String heroTag;
   final VoidCallback onPressed;
+  final AlignmentGeometry alignment;
+  final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
     final bottomOffset = MediaQuery.sizeOf(context).height * 0.16;
 
     return Align(
-      alignment: Alignment.bottomRight,
+      alignment: alignment,
       child: Padding(
-        padding: EdgeInsets.only(right: 16, bottom: bottomOffset),
+        padding: padding ?? EdgeInsets.only(right: 16, bottom: bottomOffset),
         child: FloatingActionButton.small(
           heroTag: heroTag,
           elevation: 4,

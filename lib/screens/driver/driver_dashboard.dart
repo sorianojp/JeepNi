@@ -16,6 +16,9 @@ import '../../widgets/tracking_diagnostics_sheet.dart';
 import '../../widgets/tracking_status_widgets.dart';
 
 const double _driverOverlayRadius = 18;
+const double _mapMarkerIconSize = 44;
+const Color _studentThemeColor = Color(0xFF212121);
+const Color _driverThemeColor = Color(0xFF0D47A1);
 
 class _StudentCluster {
   _StudentCluster(this.center, this.count, this.updatedAt);
@@ -141,7 +144,7 @@ class _DriverDashboardState extends State<DriverDashboard>
   }) {
     if (error != null) return Colors.red;
     if (isStarting || (isSharing && myLocation == null)) return Colors.orange;
-    if (isSharing && myLocation != null) return Colors.green;
+    if (isSharing && myLocation != null) return _driverThemeColor;
     return Colors.orange;
   }
 
@@ -274,7 +277,8 @@ class _DriverDashboardState extends State<DriverDashboard>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Driver Dashboard'),
-        backgroundColor: Colors.green,
+        backgroundColor: _driverThemeColor,
+        foregroundColor: Colors.white,
         actions: [
           if (kDebugMode)
             IconButton(
@@ -349,7 +353,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                       message:
                           'Keep GPS on while driving so students can see your live jeepney location and speed.',
                       icon: Icons.directions_bus,
-                      color: Colors.green,
+                      color: _driverThemeColor,
                       actionLabel: 'Try tracking again',
                       onAction: () =>
                           trackingService.startSharingLocation(user.id),
@@ -389,8 +393,8 @@ class _DriverDashboardState extends State<DriverDashboard>
                         ...studentClusters.map(
                           (cluster) => Marker(
                             point: cluster.center,
-                            width: 80,
-                            height: 92,
+                            width: 92,
+                            height: 96,
                             child: _StudentClusterMarker(
                               count: cluster.count,
                               isFresh: trackingService.isFreshUpdatedAt(
@@ -418,8 +422,10 @@ class _DriverDashboardState extends State<DriverDashboard>
                 ),
                 MapRecenterButton(
                   enabled: myLocation != null,
-                  color: Colors.green,
+                  color: _driverThemeColor,
                   heroTag: 'driver-recenter-location',
+                  alignment: Alignment.topRight,
+                  padding: const EdgeInsets.only(top: 88, right: 16),
                   onPressed: () => _recenterToDriverLocation(myLocation),
                 ),
                 Positioned(
@@ -458,7 +464,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                       message:
                           'Keep GPS on and stay outdoors if possible. Students will see you once the first GPS fix is ready.',
                       icon: Icons.directions_bus,
-                      color: Colors.green,
+                      color: _driverThemeColor,
                       actionLabel: 'Try tracking again',
                       onAction: () =>
                           trackingService.startSharingLocation(user.id),
@@ -518,7 +524,7 @@ class _DriverMapControls extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            const Icon(Icons.directions_bus, color: Colors.green),
+            const Icon(Icons.directions_bus, color: _driverThemeColor),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -543,9 +549,11 @@ class _DriverMapControls extends StatelessWidget {
             const SizedBox(width: 8),
             DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: _driverThemeColor.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: Colors.green.shade200),
+                border: Border.all(
+                  color: _driverThemeColor.withValues(alpha: 0.26),
+                ),
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -555,7 +563,7 @@ class _DriverMapControls extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.speed, size: 18, color: Colors.green),
+                    const Icon(Icons.speed, size: 18, color: _driverThemeColor),
                     const SizedBox(width: 4),
                     Text(
                       speedLabel,
@@ -756,7 +764,7 @@ class _StudentClustersBottomSheetState
                             onTap: () => widget.onTapCluster(cluster),
                             leading: Icon(
                               Icons.person_pin_circle,
-                              color: isFresh ? Colors.blue : Colors.grey,
+                              color: isFresh ? _studentThemeColor : Colors.grey,
                             ),
                             title: Text(title),
                             subtitle: Text(
@@ -867,7 +875,7 @@ class _OffscreenStudentIndicator extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.94),
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.blue, width: 2),
+            border: Border.all(color: _studentThemeColor, width: 2),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.18),
@@ -885,7 +893,7 @@ class _OffscreenStudentIndicator extends StatelessWidget {
               children: [
                 const Icon(
                   Icons.person_pin_circle,
-                  color: Colors.blue,
+                  color: _studentThemeColor,
                   size: 28,
                 ),
                 if (count > 1)
@@ -894,7 +902,7 @@ class _OffscreenStudentIndicator extends StatelessWidget {
                     right: -7,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Colors.blue,
+                        color: _studentThemeColor,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),
@@ -930,19 +938,25 @@ class _DriverMarker extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.directions_bus, color: Colors.green, size: 44),
+        const Icon(
+          Icons.directions_bus,
+          color: _driverThemeColor,
+          size: _mapMarkerIconSize,
+        ),
         DecoratedBox(
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.green.shade200),
+            border: Border.all(
+              color: _driverThemeColor.withValues(alpha: 0.26),
+            ),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             child: Text(
               speedLabel,
               style: const TextStyle(
-                color: Colors.green,
+                color: _driverThemeColor,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
@@ -973,7 +987,11 @@ class _StudentClusterMarker extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.person_pin_circle, color: Colors.blue, size: 30),
+            const Icon(
+              Icons.person_pin_circle,
+              color: _studentThemeColor,
+              size: _mapMarkerIconSize,
+            ),
             Text(
               freshnessLabel.replaceFirst('Updated ', ''),
               style: const TextStyle(
@@ -996,21 +1014,25 @@ class _StudentClusterMarker extends StatelessWidget {
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              const Icon(Icons.person_pin_circle, color: Colors.blue, size: 42),
+              const Icon(
+                Icons.person_pin_circle,
+                color: _studentThemeColor,
+                size: _mapMarkerIconSize,
+              ),
               Positioned(
                 top: -10,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.blue, width: 2),
+                    border: Border.all(color: _studentThemeColor, width: 2),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(6),
                     child: Text(
                       count.toString(),
                       style: const TextStyle(
-                        color: Colors.blue,
+                        color: _studentThemeColor,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
