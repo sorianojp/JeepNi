@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'screens/splash/splash_screen.dart';
 import 'firebase_options.dart';
 import 'services/firebase_auth_service.dart';
 import 'services/firebase_tracking_service.dart';
@@ -33,9 +34,12 @@ class JeepNiApp extends StatefulWidget {
 }
 
 class _JeepNiAppState extends State<JeepNiApp> {
+  static const _minimumSplashDuration = Duration(milliseconds: 1600);
+
   late final FirebaseAuthService _authService;
   late final FirebaseTrackingService _trackingService;
   late final GoRouter _router;
+  bool _hasShownSplash = false;
 
   @override
   void initState() {
@@ -43,6 +47,13 @@ class _JeepNiAppState extends State<JeepNiApp> {
     _authService = FirebaseAuthService();
     _trackingService = FirebaseTrackingService();
     _router = createRouter(_authService);
+    Future<void>.delayed(_minimumSplashDuration, () {
+      if (!mounted) return;
+
+      setState(() {
+        _hasShownSplash = true;
+      });
+    });
   }
 
   @override
@@ -55,18 +66,39 @@ class _JeepNiAppState extends State<JeepNiApp> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+      useMaterial3: true,
+    );
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: _authService),
         ChangeNotifierProvider.value(value: _trackingService),
       ],
-      child: MaterialApp.router(
-        title: 'JeepNi Tracking',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-          useMaterial3: true,
-        ),
-        routerConfig: _router,
+      child: AnimatedBuilder(
+        animation: _authService,
+        builder: (context, child) {
+          final isReady = _hasShownSplash && _authService.isInitialized;
+
+          if (!isReady) {
+            return MaterialApp(
+              title: 'JeepNi Tracking',
+              theme: theme,
+              home: SplashScreen(
+                message: _authService.isInitialized
+                    ? 'Launching JeepNi...'
+                    : 'Checking your session...',
+              ),
+            );
+          }
+
+          return MaterialApp.router(
+            title: 'JeepNi Tracking',
+            theme: theme,
+            routerConfig: _router,
+          );
+        },
       ),
     );
   }

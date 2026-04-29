@@ -5,9 +5,9 @@ import '../screens/driver/driver_dashboard.dart';
 import '../screens/admin/admin_dashboard.dart';
 import '../screens/admin/admin_create_driver_screen.dart';
 import '../screens/admin/admin_map_screen.dart';
+import '../screens/splash/splash_screen.dart';
 import '../services/firebase_auth_service.dart';
 import '../models/user_model.dart';
-import 'package:flutter/material.dart';
 
 GoRouter createRouter(FirebaseAuthService authService) {
   return GoRouter(
@@ -44,10 +44,7 @@ GoRouter createRouter(FirebaseAuthService authService) {
       return null;
     },
     routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const _AuthLoadingScreen(),
-      ),
+      GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/student',
@@ -71,13 +68,4 @@ GoRouter createRouter(FirebaseAuthService authService) {
       ),
     ],
   );
-}
-
-class _AuthLoadingScreen extends StatelessWidget {
-  const _AuthLoadingScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
-  }
 }
