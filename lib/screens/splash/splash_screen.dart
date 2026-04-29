@@ -45,13 +45,13 @@ class SplashScreen extends StatelessWidget {
                               ),
                             ],
                           ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Image.asset(
-                                'assets/logo.png',
-                                fit: BoxFit.contain,
-                              ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Image.asset(
+                              'assets/logo.png',
+                              fit: BoxFit.contain,
                             ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 28),
@@ -97,6 +97,25 @@ class SplashScreen extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: textTheme.bodyMedium?.copyWith(
                         color: Colors.white.withValues(alpha: 0.9),
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Inspired by the capstone project of UdD IT students from comCUTErs.',
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.78),
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Copyright © ArzaTechnologies',
+                      textAlign: TextAlign.center,
+                      style: textTheme.labelLarge?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.86),
+                        fontWeight: FontWeight.w700,
                         letterSpacing: 0.2,
                       ),
                     ),
