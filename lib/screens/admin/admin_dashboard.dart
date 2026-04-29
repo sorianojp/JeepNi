@@ -21,6 +21,11 @@ class AdminDashboard extends StatelessWidget {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'About JeepNi',
+            onPressed: () => context.push('/about'),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
               authService.logout();

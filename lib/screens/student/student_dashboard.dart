@@ -235,6 +235,11 @@ class _StudentDashboardState extends State<StudentDashboard>
       appBar: AppBar(
         title: const Text('Student Dashboard'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'About JeepNi',
+            onPressed: () => context.push('/about'),
+          ),
           if (kDebugMode)
             IconButton(
               icon: const Icon(Icons.bug_report),
