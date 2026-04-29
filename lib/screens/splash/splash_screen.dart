@@ -45,13 +45,13 @@ class SplashScreen extends StatelessWidget {
                               ),
                             ],
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Image.asset(
-                              'images/logo.png',
-                              fit: BoxFit.contain,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Image.asset(
+                                'assets/logo.png',
+                                fit: BoxFit.contain,
+                              ),
                             ),
-                          ),
                         ),
                       ),
                       const SizedBox(height: 28),

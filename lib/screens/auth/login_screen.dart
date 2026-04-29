@@ -148,12 +148,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                   offset: const Offset(0, 12),
                                 ),
                               ],
+                              ),
+                              child: Image.asset(
+                                'assets/logo.png',
+                                fit: BoxFit.contain,
+                              ),
                             ),
-                            child: Image.asset(
-                              'images/logo.png',
-                              fit: BoxFit.contain,
-                            ),
-                          ),
                           const SizedBox(width: 16),
                           Flexible(
                             child: Text(
