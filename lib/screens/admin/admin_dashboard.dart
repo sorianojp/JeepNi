@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../services/firebase_auth_service.dart';
 
+const Color _adminThemeColor = Color(0xFF1A237E);
+const Color _driverThemeColor = Color(0xFF0D47A1);
+
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
 
@@ -14,7 +17,8 @@ class AdminDashboard extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
-        backgroundColor: Colors.purple,
+        backgroundColor: _adminThemeColor,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -33,19 +37,46 @@ class AdminDashboard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.purple.shade50,
-                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  colors: [
+                    _adminThemeColor.withValues(alpha: 0.12),
+                    _driverThemeColor.withValues(alpha: 0.08),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _adminThemeColor.withValues(alpha: 0.14),
+                ),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.admin_panel_settings),
-                  SizedBox(width: 8),
-                  Expanded(
+                  const Icon(
+                    Icons.admin_panel_settings,
+                    color: _adminThemeColor,
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
                     child: Text(
                       'Admin tools',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.82),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      child: Text(
+                        'Live ops',
+                        style: TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
                   ),
@@ -57,6 +88,7 @@ class AdminDashboard extends StatelessWidget {
               icon: Icons.map,
               title: 'Live Map',
               subtitle: 'View live student and driver locations.',
+              color: _adminThemeColor,
               onTap: () => context.go('/admin/map'),
             ),
             const SizedBox(height: 12),
@@ -64,6 +96,7 @@ class AdminDashboard extends StatelessWidget {
               icon: Icons.person_add,
               title: 'Create Driver',
               subtitle: 'Create a driver login account.',
+              color: _driverThemeColor,
               onTap: () => context.go('/admin/drivers'),
             ),
           ],
@@ -78,12 +111,14 @@ class _AdminActionCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.color,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
+  final Color color;
   final VoidCallback onTap;
 
   @override
@@ -92,7 +127,7 @@ class _AdminActionCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.purple.shade100),
+        side: BorderSide(color: color.withValues(alpha: 0.18)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -102,8 +137,8 @@ class _AdminActionCard extends StatelessWidget {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: Colors.purple.shade50,
-                foregroundColor: Colors.purple,
+                backgroundColor: color.withValues(alpha: 0.1),
+                foregroundColor: color,
                 child: Icon(icon),
               ),
               const SizedBox(width: 16),
@@ -126,7 +161,7 @@ class _AdminActionCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              Icon(Icons.chevron_right, color: Colors.grey.shade700),
             ],
           ),
         ),

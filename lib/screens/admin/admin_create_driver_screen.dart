@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../services/firebase_auth_service.dart';
 
+const Color _adminThemeColor = Color(0xFF1A237E);
+const Color _driverThemeColor = Color(0xFF0D47A1);
+
 class AdminCreateDriverScreen extends StatefulWidget {
   const AdminCreateDriverScreen({super.key});
 
@@ -74,7 +77,8 @@ class _AdminCreateDriverScreenState extends State<AdminCreateDriverScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Driver'),
-        backgroundColor: Colors.purple,
+        backgroundColor: _adminThemeColor,
+        foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/admin'),
@@ -85,19 +89,49 @@ class _AdminCreateDriverScreenState extends State<AdminCreateDriverScreen> {
         child: Card(
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Colors.purple.shade100),
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: _driverThemeColor.withValues(alpha: 0.18)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Create Driver Account',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Row(
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: _driverThemeColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: Icon(
+                          Icons.directions_bus,
+                          color: _driverThemeColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Create Driver Account',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text('Driver can log in after account creation.'),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 TextField(
                   controller: _driverNameController,
                   decoration: const InputDecoration(
@@ -131,17 +165,21 @@ class _AdminCreateDriverScreenState extends State<AdminCreateDriverScreen> {
                       _driverFormMessage!,
                       style: TextStyle(
                         color: _driverFormMessage == 'Driver account created.'
-                            ? Colors.green
+                            ? _driverThemeColor
                             : Colors.red,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
+                  child: FilledButton.icon(
                     onPressed: _isCreatingDriver
                         ? null
                         : () => _createDriver(authService),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _driverThemeColor,
+                    ),
                     icon: _isCreatingDriver
                         ? const SizedBox(
                             width: 18,
