@@ -235,11 +235,6 @@ class _StudentDashboardState extends State<StudentDashboard>
       appBar: AppBar(
         title: const Text('Student Dashboard'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'About JeepNi',
-            onPressed: () => context.push('/about'),
-          ),
           if (kDebugMode)
             IconButton(
               icon: const Icon(Icons.bug_report),
@@ -252,13 +247,9 @@ class _StudentDashboardState extends State<StudentDashboard>
               ),
             ),
           IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await trackingService.stopSharingLocation(user.id);
-              authService.logout();
-              if (!context.mounted) return;
-              context.go('/login');
-            },
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Account settings',
+            onPressed: () => context.push('/account/settings'),
           ),
         ],
       ),

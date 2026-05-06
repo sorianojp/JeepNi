@@ -239,6 +239,100 @@ class FirebaseAuthService extends ChangeNotifier {
     }
   }
 
+  Future<bool> deleteCurrentAccount({required String password}) async {
+    _lastError = null;
+
+    final authUser = fb.FirebaseAuth.instance.currentUser;
+    final profile = _currentUser;
+
+    if (authUser == null || profile == null) {
+      _lastError = 'No signed-in account was found.';
+      return false;
+    }
+
+    final email = authUser.email;
+    if (email == null || email.isEmpty) {
+      _lastError = 'This account cannot be deleted in-app right now.';
+      return false;
+    }
+
+    var deletedProfile = false;
+
+    try {
+      final credential = fb.EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
+      await authUser.reauthenticateWithCredential(credential);
+
+      final firestore = FirebaseFirestore.instance;
+      await firestore
+          .collection('locations')
+          .doc(profile.id)
+          .delete()
+          .catchError((_) {
+            // Ignore missing location documents during deletion cleanup.
+          });
+
+      await firestore.collection('users').doc(profile.id).delete();
+      deletedProfile = true;
+
+      await authUser.delete();
+      _currentUser = null;
+      notifyListeners();
+      return true;
+    } on fb.FirebaseAuthException catch (error, stackTrace) {
+      _debugAuthError('deleteCurrentAccount', error, stackTrace);
+      await _restoreDeletedProfileIfNeeded(
+        profile: profile,
+        shouldRestore: deletedProfile,
+      );
+
+      switch (error.code) {
+        case 'wrong-password':
+        case 'invalid-credential':
+          _lastError = 'Incorrect password.';
+          break;
+        case 'requires-recent-login':
+          _lastError =
+              'Please sign in again, then return here to delete your account.';
+          break;
+        default:
+          _lastError = error.message ?? error.code;
+      }
+      return false;
+    } on FirebaseException catch (error, stackTrace) {
+      _debugAuthError('deleteCurrentAccount', error, stackTrace);
+      await _restoreDeletedProfileIfNeeded(
+        profile: profile,
+        shouldRestore: deletedProfile,
+      );
+      _lastError = error.message ?? error.code;
+      return false;
+    } catch (error, stackTrace) {
+      _debugAuthError('deleteCurrentAccount', error, stackTrace);
+      await _restoreDeletedProfileIfNeeded(
+        profile: profile,
+        shouldRestore: deletedProfile,
+      );
+      _lastError = error.toString();
+      return false;
+    }
+  }
+
+  Future<void> _restoreDeletedProfileIfNeeded({
+    required UserModel profile,
+    required bool shouldRestore,
+  }) async {
+    if (!shouldRestore) return;
+
+    try {
+      await _writeProfile(profile);
+    } catch (error, stackTrace) {
+      _debugAuthError('restoreDeletedProfileIfNeeded', error, stackTrace);
+    }
+  }
+
   void logout() {
     _currentUser = null;
     notifyListeners();

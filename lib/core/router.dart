@@ -1,5 +1,7 @@
 import 'package:go_router/go_router.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/account/account_settings_screen.dart';
+import '../screens/account/delete_account_screen.dart';
 import '../screens/about/about_app_screen.dart';
 import '../screens/student/student_dashboard.dart';
 import '../screens/driver/driver_dashboard.dart';
@@ -50,6 +52,14 @@ GoRouter createRouter(FirebaseAuthService authService) {
       GoRoute(
         path: '/about',
         builder: (context, state) => const AboutAppScreen(),
+      ),
+      GoRoute(
+        path: '/account/settings',
+        builder: (context, state) => const AccountSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/account/delete',
+        builder: (context, state) => const DeleteAccountScreen(),
       ),
       GoRoute(
         path: '/student',

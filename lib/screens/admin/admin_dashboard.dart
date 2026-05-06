@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-
-import '../../services/firebase_auth_service.dart';
-
 const Color _adminThemeColor = Color(0xFF1A237E);
 const Color _driverThemeColor = Color(0xFF0D47A1);
 
@@ -12,8 +8,6 @@ class AdminDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<FirebaseAuthService>(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
@@ -21,16 +15,9 @@ class AdminDashboard extends StatelessWidget {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'About JeepNi',
-            onPressed: () => context.push('/about'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              authService.logout();
-              context.go('/login');
-            },
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Account settings',
+            onPressed: () => context.push('/account/settings'),
           ),
         ],
       ),

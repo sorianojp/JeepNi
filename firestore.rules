@@ -87,7 +87,7 @@ service cloud.firestore {
         && request.resource.data.role == resource.data.role
         && validRole(request.resource.data.role);
 
-      allow delete: if false;
+      allow delete: if isOwnDoc(userId);
     }
 
     match /locations/{userId} {
