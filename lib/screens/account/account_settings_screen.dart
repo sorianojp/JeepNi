@@ -6,6 +6,7 @@ import '../../core/app_routes.dart';
 import '../../models/user_model.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_tracking_service.dart';
+import '../../services/nearby_driver_alert_service.dart';
 
 class AccountSettingsScreen extends StatelessWidget {
   const AccountSettingsScreen({super.key});
@@ -38,6 +39,7 @@ class AccountSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authService = context.watch<FirebaseAuthService>();
+    final nearbyDriverAlertService = context.watch<NearbyDriverAlertService>();
     final user = authService.currentUser;
 
     if (user == null) {
@@ -94,6 +96,93 @@ class AccountSettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
+            if (user.role == UserRole.student) ...[
+              const Text(
+                'Notifications',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 10),
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: Colors.blueGrey.shade100),
+                ),
+                child: Column(
+                  children: [
+                    SwitchListTile.adaptive(
+                      value: nearbyDriverAlertService.alertsEnabled,
+                      onChanged: nearbyDriverAlertService.isUpdatingPreference
+                          ? null
+                          : (enabled) async {
+                              await nearbyDriverAlertService.setAlertsEnabled(
+                                enabled,
+                              );
+                              if (!context.mounted) return;
+                              if (nearbyDriverAlertService
+                                  .requiresSystemPermission) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Allow system notifications for JeepNi to receive nearby driver alerts.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                      secondary: const Icon(
+                        Icons.notifications_active_outlined,
+                      ),
+                      title: const Text('Nearby Driver Alerts'),
+                      subtitle: Text(
+                        nearbyDriverAlertService.settingsDescription,
+                      ),
+                    ),
+                    if (nearbyDriverAlertService.requiresSystemPermission) ...[
+                      Divider(height: 1, color: Colors.blueGrey.shade100),
+                      ListTile(
+                        leading: const Icon(Icons.app_settings_alt_outlined),
+                        title: const Text('System Notification Settings'),
+                        subtitle: const Text(
+                          'Open app settings and allow notifications for JeepNi.',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: nearbyDriverAlertService.openAppSettings,
+                      ),
+                    ],
+                    if (nearbyDriverAlertService
+                        .notificationsPermissionGranted) ...[
+                      Divider(height: 1, color: Colors.blueGrey.shade100),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.notification_important_outlined,
+                        ),
+                        title: const Text('Send Test Notification'),
+                        subtitle: const Text(
+                          'Use this device to verify nearby alerts are displayed.',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () async {
+                          final sent = await nearbyDriverAlertService
+                              .sendTestNotification();
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                sent
+                                    ? 'Test notification sent.'
+                                    : 'Enable system notifications for JeepNi first.',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
             const Text(
               'Account',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),

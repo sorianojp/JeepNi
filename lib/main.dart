@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'screens/splash/splash_screen.dart';
 import 'firebase_options.dart';
 import 'services/firebase_auth_service.dart';
+import 'services/nearby_driver_alert_service.dart';
 import 'services/firebase_tracking_service.dart';
 import 'core/router.dart';
 
@@ -38,6 +41,7 @@ class _JeepNiAppState extends State<JeepNiApp> {
 
   late final FirebaseAuthService _authService;
   late final FirebaseTrackingService _trackingService;
+  late final NearbyDriverAlertService _nearbyDriverAlertService;
   late final GoRouter _router;
   bool _hasShownSplash = false;
 
@@ -46,6 +50,11 @@ class _JeepNiAppState extends State<JeepNiApp> {
     super.initState();
     _authService = FirebaseAuthService();
     _trackingService = FirebaseTrackingService();
+    _nearbyDriverAlertService = NearbyDriverAlertService(
+      _authService,
+      _trackingService,
+    );
+    unawaited(_nearbyDriverAlertService.initialize());
     _router = createRouter(_authService);
     Future<void>.delayed(_minimumSplashDuration, () {
       if (!mounted) return;
@@ -58,6 +67,7 @@ class _JeepNiAppState extends State<JeepNiApp> {
 
   @override
   void dispose() {
+    _nearbyDriverAlertService.dispose();
     _authService.dispose();
     _trackingService.dispose();
     _router.dispose();
@@ -75,6 +85,7 @@ class _JeepNiAppState extends State<JeepNiApp> {
       providers: [
         ChangeNotifierProvider.value(value: _authService),
         ChangeNotifierProvider.value(value: _trackingService),
+        ChangeNotifierProvider.value(value: _nearbyDriverAlertService),
       ],
       child: AnimatedBuilder(
         animation: _authService,
