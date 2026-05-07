@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_routes.dart';
 import '../../models/user_model.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_tracking_service.dart';
@@ -31,7 +32,7 @@ class AccountSettingsScreen extends StatelessWidget {
 
     authService.logout();
     if (!context.mounted) return;
-    context.go('/login');
+    context.go(AppRoutes.login);
   }
 
   @override
@@ -109,9 +110,11 @@ class AccountSettingsScreen extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.info_outline),
                     title: const Text('About JeepNi'),
-                    subtitle: const Text('View app details and feature summary.'),
+                    subtitle: const Text(
+                      'View app details and feature summary.',
+                    ),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.push('/about'),
+                    onTap: () => context.push(AppRoutes.about),
                   ),
                   Divider(height: 1, color: Colors.blueGrey.shade100),
                   ListTile(
@@ -121,7 +124,7 @@ class AccountSettingsScreen extends StatelessWidget {
                       'Permanently remove your account and live location data.',
                     ),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.push('/account/delete'),
+                    onTap: () => context.push(AppRoutes.accountDelete),
                   ),
                   Divider(height: 1, color: Colors.blueGrey.shade100),
                   ListTile(

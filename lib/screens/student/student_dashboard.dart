@@ -4,12 +4,13 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../services/firebase_auth_service.dart';
-import '../../services/firebase_tracking_service.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
+import '../../core/app_routes.dart';
 import '../../core/map_camera_animator.dart';
+import '../../services/firebase_auth_service.dart';
+import '../../services/firebase_tracking_service.dart';
 import '../../widgets/app_map_tile_layer.dart';
 import '../../widgets/map_recenter_button.dart';
 import '../../widgets/tracking_diagnostics_sheet.dart';
@@ -249,7 +250,7 @@ class _StudentDashboardState extends State<StudentDashboard>
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Account settings',
-            onPressed: () => context.push('/account/settings'),
+            onPressed: () => context.push(AppRoutes.accountSettings),
           ),
         ],
       ),

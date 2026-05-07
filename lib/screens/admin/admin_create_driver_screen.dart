@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_routes.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../widgets/app_primary_button.dart';
+import '../../widgets/app_text_field.dart';
 
 const Color _adminThemeColor = Color(0xFF1A237E);
 const Color _driverThemeColor = Color(0xFF0D47A1);
@@ -81,7 +84,7 @@ class _AdminCreateDriverScreenState extends State<AdminCreateDriverScreen> {
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/admin'),
+          onPressed: () => context.go(AppRoutes.admin),
         ),
       ),
       body: SingleChildScrollView(
@@ -132,30 +135,28 @@ class _AdminCreateDriverScreenState extends State<AdminCreateDriverScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                TextField(
+                AppTextField(
                   controller: _driverNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Driver full name',
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Driver full name',
+                  hint: 'Enter full name',
+                  icon: Icons.badge_outlined,
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                AppTextField(
                   controller: _driverEmailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Driver email',
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Driver email',
+                  hint: 'driver@example.com',
+                  icon: Icons.alternate_email_rounded,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                AppTextField(
                   controller: _driverPasswordController,
                   obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Temporary password',
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Temporary password',
+                  hint: 'Enter temporary password',
+                  icon: Icons.lock_outline_rounded,
                 ),
                 const SizedBox(height: 12),
                 if (_driverFormMessage != null)
@@ -171,26 +172,13 @@ class _AdminCreateDriverScreenState extends State<AdminCreateDriverScreen> {
                       ),
                     ),
                   ),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _isCreatingDriver
-                        ? null
-                        : () => _createDriver(authService),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _driverThemeColor,
-                    ),
-                    icon: _isCreatingDriver
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.person_add),
-                    label: Text(
-                      _isCreatingDriver ? 'Creating...' : 'Create driver',
-                    ),
-                  ),
+                AppPrimaryButton(
+                  label: _isCreatingDriver ? 'Creating...' : 'Create driver',
+                  onPressed: () => _createDriver(authService),
+                  isLoading: _isCreatingDriver,
+                  icon: Icons.person_add,
+                  backgroundColor: _driverThemeColor,
+                  foregroundColor: Colors.white,
                 ),
               ],
             ),

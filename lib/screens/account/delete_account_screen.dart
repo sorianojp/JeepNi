@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_routes.dart';
+import '../../widgets/app_primary_button.dart';
+import '../../widgets/app_secondary_button.dart';
+import '../../widgets/app_text_field.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_tracking_service.dart';
 
@@ -69,7 +73,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
     });
 
     if (success) {
-      context.go('/login');
+      context.go(AppRoutes.login);
     }
   }
 
@@ -132,14 +136,13 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
-            TextField(
+            AppTextField(
               controller: _passwordController,
+              label: 'Current password',
+              hint: 'Enter your password',
+              icon: Icons.lock_outline_rounded,
               obscureText: true,
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Enter your password',
-              ),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -147,14 +150,13 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
-            TextField(
+            AppTextField(
               controller: _confirmationController,
+              label: 'Confirmation',
+              hint: 'DELETE',
+              icon: Icons.warning_amber_rounded,
               autocorrect: false,
               enableSuggestions: false,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'DELETE',
-              ),
             ),
             if (error != null) ...[
               const SizedBox(height: 12),
@@ -167,18 +169,18 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
               ),
             ],
             const SizedBox(height: 24),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              onPressed: _isDeleting ? null : _deleteAccount,
-              child: Text(_isDeleting ? 'Deleting...' : 'Delete account'),
+            AppPrimaryButton(
+              label: _isDeleting ? 'Deleting...' : 'Delete account',
+              onPressed: _deleteAccount,
+              isLoading: _isDeleting,
+              backgroundColor: Colors.red.shade700,
             ),
             const SizedBox(height: 12),
-            TextButton(
+            AppSecondaryButton(
+              label: 'Cancel',
               onPressed: _isDeleting ? null : () => context.pop(),
-              child: const Text('Cancel'),
+              foregroundColor: Colors.blueGrey.shade800,
+              borderColor: Colors.blueGrey.shade100,
             ),
           ],
         ),

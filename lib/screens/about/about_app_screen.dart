@@ -132,7 +132,7 @@ class AboutAppScreen extends StatelessWidget {
                             const SizedBox(height: 10),
                             const _CapstoneNameLine(name: 'Rica May Simbulan'),
                             const SizedBox(height: 6),
-                            const _CapstoneNameLine(name: 'Bryle Navarri'),
+                            const _CapstoneNameLine(name: 'Bryle Navarro'),
                             const SizedBox(height: 6),
                             const _CapstoneNameLine(name: 'Hilarion Ildefonso'),
                             const SizedBox(height: 6),

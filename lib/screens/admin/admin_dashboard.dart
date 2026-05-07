@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../core/app_routes.dart';
+
 const Color _adminThemeColor = Color(0xFF1A237E);
 const Color _driverThemeColor = Color(0xFF0D47A1);
 
@@ -17,7 +20,7 @@ class AdminDashboard extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Account settings',
-            onPressed: () => context.push('/account/settings'),
+            onPressed: () => context.push(AppRoutes.accountSettings),
           ),
         ],
       ),
@@ -81,7 +84,7 @@ class AdminDashboard extends StatelessWidget {
               title: 'Live Map',
               subtitle: 'View live student and driver locations.',
               color: _adminThemeColor,
-              onTap: () => context.go('/admin/map'),
+              onTap: () => context.go(AppRoutes.adminMap),
             ),
             const SizedBox(height: 12),
             _AdminActionCard(
@@ -89,7 +92,7 @@ class AdminDashboard extends StatelessWidget {
               title: 'Create Driver',
               subtitle: 'Create a driver login account.',
               color: _driverThemeColor,
-              onTap: () => context.go('/admin/drivers'),
+              onTap: () => context.go(AppRoutes.adminDrivers),
             ),
           ],
         ),

@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'app_routes.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/account/account_settings_screen.dart';
 import '../screens/account/delete_account_screen.dart';
@@ -14,7 +15,7 @@ import '../models/user_model.dart';
 
 GoRouter createRouter(FirebaseAuthService authService) {
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: AppRoutes.splash,
     refreshListenable: authService,
     redirect: (context, state) {
       if (!authService.isInitialized) {
@@ -23,62 +24,69 @@ GoRouter createRouter(FirebaseAuthService authService) {
 
       final isAuthenticated = authService.currentUser != null;
 
-      if (!isAuthenticated && state.matchedLocation == '/') {
-        return '/login';
+      if (!isAuthenticated && state.matchedLocation == AppRoutes.splash) {
+        return AppRoutes.login;
       }
 
-      if (!isAuthenticated && state.matchedLocation != '/login') {
-        return '/login';
+      if (!isAuthenticated && state.matchedLocation != AppRoutes.login) {
+        return AppRoutes.login;
       }
 
       if (isAuthenticated &&
-          (state.matchedLocation == '/' || state.matchedLocation == '/login')) {
+          (state.matchedLocation == AppRoutes.splash ||
+              state.matchedLocation == AppRoutes.login)) {
         final role = authService.currentUser!.role;
         switch (role) {
           case UserRole.student:
-            return '/student';
+            return AppRoutes.student;
           case UserRole.driver:
-            return '/driver';
+            return AppRoutes.driver;
           case UserRole.admin:
-            return '/admin';
+            return AppRoutes.admin;
         }
       }
 
       return null;
     },
     routes: [
-      GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
-        path: '/about',
+        path: AppRoutes.splash,
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.login,
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.about,
         builder: (context, state) => const AboutAppScreen(),
       ),
       GoRoute(
-        path: '/account/settings',
+        path: AppRoutes.accountSettings,
         builder: (context, state) => const AccountSettingsScreen(),
       ),
       GoRoute(
-        path: '/account/delete',
+        path: AppRoutes.accountDelete,
         builder: (context, state) => const DeleteAccountScreen(),
       ),
       GoRoute(
-        path: '/student',
+        path: AppRoutes.student,
         builder: (context, state) => const StudentDashboard(),
       ),
       GoRoute(
-        path: '/driver',
+        path: AppRoutes.driver,
         builder: (context, state) => const DriverDashboard(),
       ),
       GoRoute(
-        path: '/admin',
+        path: AppRoutes.admin,
         builder: (context, state) => const AdminDashboard(),
       ),
       GoRoute(
-        path: '/admin/map',
+        path: AppRoutes.adminMap,
         builder: (context, state) => const AdminMapScreen(),
       ),
       GoRoute(
-        path: '/admin/drivers',
+        path: AppRoutes.adminDrivers,
         builder: (context, state) => const AdminCreateDriverScreen(),
       ),
     ],

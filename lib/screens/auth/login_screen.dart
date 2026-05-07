@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_routes.dart';
+import '../../core/app_ui.dart';
 import '../../models/user_model.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../widgets/app_primary_button.dart';
+import '../../widgets/app_text_field.dart';
 
-const Color _loginBackgroundColor = Color(0xFF0D47A1);
-const Color _loginAccentColor = Color(0xFFFFB300);
-const Color _loginSurfaceColor = Color(0xFFF8FAFC);
-const Color _loginFieldColor = Color(0xFFF1F5F9);
-const Color _loginTextColor = Color(0xFF0F172A);
+const Color _loginBackgroundColor = AppUi.primaryBlue;
+const Color _loginAccentColor = AppUi.accentAmber;
+const Color _loginSurfaceColor = AppUi.panelSurface;
+const Color _loginTextColor = AppUi.textPrimary;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -77,13 +80,13 @@ class _LoginScreenState extends State<LoginScreen> {
       final role = authService.currentUser!.role;
       switch (role) {
         case UserRole.student:
-          context.go('/student');
+          context.go(AppRoutes.student);
           break;
         case UserRole.driver:
-          context.go('/driver');
+          context.go(AppRoutes.driver);
           break;
         case UserRole.admin:
-          context.go('/admin');
+          context.go(AppRoutes.admin);
           break;
       }
     } else {
@@ -148,12 +151,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                   offset: const Offset(0, 12),
                                 ),
                               ],
-                              ),
-                              child: Image.asset(
-                                'assets/logo.png',
-                                fit: BoxFit.contain,
-                              ),
                             ),
+                            child: Image.asset(
+                              'assets/logo.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
                           const SizedBox(width: 16),
                           Flexible(
                             child: Text(
@@ -237,7 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ? Column(
                                       key: const ValueKey('name-field'),
                                       children: [
-                                        _AuthTextField(
+                                        AppTextField(
                                           controller: _nameController,
                                           label: 'Full name',
                                           hint: 'Juan Dela Cruz',
@@ -254,7 +257,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       key: ValueKey('no-name-field'),
                                     ),
                             ),
-                            _AuthTextField(
+                            AppTextField(
                               controller: _emailController,
                               label: 'Email',
                               hint: 'you@example.com',
@@ -264,7 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               autofillHints: const [AutofillHints.username],
                             ),
                             const SizedBox(height: 16),
-                            _AuthTextField(
+                            AppTextField(
                               controller: _passwordController,
                               label: 'Password',
                               hint: 'Enter your password',
@@ -324,41 +327,12 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                             const SizedBox(height: 24),
-                            SizedBox(
-                              height: 56,
-                              child: FilledButton(
-                                onPressed: _isLoading ? null : _submit,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: _loginBackgroundColor,
-                                  foregroundColor: Colors.white,
-                                  disabledBackgroundColor: _loginBackgroundColor
-                                      .withValues(alpha: 0.65),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.4,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                Colors.white,
-                                              ),
-                                        ),
-                                      )
-                                    : Text(
-                                        _isRegistering
-                                            ? 'Create account'
-                                            : 'Log in',
-                                        style: textTheme.titleMedium?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                              ),
+                            AppPrimaryButton(
+                              label: _isRegistering
+                                  ? 'Create account'
+                                  : 'Log in',
+                              onPressed: _submit,
+                              isLoading: _isLoading,
                             ),
                             const SizedBox(height: 18),
                             Text(
@@ -507,77 +481,6 @@ class _ModeButton extends StatelessWidget {
               color: selected ? _loginTextColor : Colors.blueGrey.shade700,
               fontWeight: FontWeight.w700,
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AuthTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
-  final String hint;
-  final IconData icon;
-  final TextInputType? keyboardType;
-  final TextInputAction? textInputAction;
-  final Iterable<String>? autofillHints;
-  final bool obscureText;
-  final bool autocorrect;
-  final bool enableSuggestions;
-  final Widget? suffixIcon;
-  final ValueChanged<String>? onSubmitted;
-
-  const _AuthTextField({
-    required this.controller,
-    required this.label,
-    required this.hint,
-    required this.icon,
-    this.keyboardType,
-    this.textInputAction,
-    this.autofillHints,
-    this.obscureText = false,
-    this.autocorrect = true,
-    this.enableSuggestions = true,
-    this.suffixIcon,
-    this.onSubmitted,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      textInputAction: textInputAction,
-      autofillHints: autofillHints,
-      obscureText: obscureText,
-      autocorrect: autocorrect,
-      enableSuggestions: enableSuggestions,
-      onSubmitted: onSubmitted,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon),
-        suffixIcon: suffixIcon,
-        filled: true,
-        fillColor: _loginFieldColor,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 18,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(
-            color: _loginBackgroundColor,
-            width: 1.4,
           ),
         ),
       ),

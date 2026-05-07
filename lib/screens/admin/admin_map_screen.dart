@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_routes.dart';
 import '../../core/map_camera_animator.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_tracking_service.dart';
@@ -80,7 +81,7 @@ class _AdminMapScreenState extends State<AdminMapScreen>
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/admin'),
+          onPressed: () => context.go(AppRoutes.admin),
         ),
         actions: [
           if (kDebugMode && adminUser != null)
