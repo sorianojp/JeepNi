@@ -1,4 +1,4 @@
-package com.arzatech.jeepni
+package com.arzatech.ejeep
 
 import io.flutter.embedding.android.FlutterActivity
 
