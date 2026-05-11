@@ -1,6 +1,6 @@
 {
-    "name": "jeepni",
-    "short_name": "jeepni",
+    "name": "eJeep",
+    "short_name": "eJeep",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

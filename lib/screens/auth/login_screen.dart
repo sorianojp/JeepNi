@@ -160,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 16),
                           Flexible(
                             child: Text(
-                              'JeepNi',
+                              'eJeep',
                               style: textTheme.displaySmall?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,
@@ -215,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             Text(
                               _isRegistering
                                   ? 'Students can sign up here. Driver accounts are created by an admin.'
-                                  : 'Use your JeepNi credentials to continue.',
+                                  : 'Use your eJeep credentials to continue.',
                               style: textTheme.bodyMedium?.copyWith(
                                 color: Colors.blueGrey.shade700,
                                 height: 1.45,

@@ -1,4 +1,4 @@
-# jeepni
+# ejeep
 
 A new Flutter project.
 

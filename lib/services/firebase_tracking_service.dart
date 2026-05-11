@@ -612,7 +612,7 @@ class FirebaseTrackingService extends ChangeNotifier {
 
     if (permission == LocationPermission.deniedForever) {
       _locationError =
-          'Enable location permission for JeepNi in system settings.';
+          'Enable location permission for eJeep in system settings.';
       return false;
     }
 
@@ -652,7 +652,7 @@ class FirebaseTrackingService extends ChangeNotifier {
           timeLimit: timeLimit,
           foregroundNotificationConfig: useForegroundService
               ? const ForegroundNotificationConfig(
-                  notificationTitle: 'JeepNi live location',
+                  notificationTitle: 'eJeep live location',
                   notificationText: 'Sharing your location for live tracking.',
                   notificationChannelName: 'Live location',
                   enableWakeLock: true,

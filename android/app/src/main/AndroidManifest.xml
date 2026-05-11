@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:label="jeepni"
+        android:label="ejeep"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

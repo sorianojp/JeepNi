@@ -8,23 +8,23 @@ import '../screens/splash/splash_screen.dart';
 import '../services/firebase_auth_service.dart';
 import 'app_scope.dart';
 
-class JeepNiApp extends StatelessWidget {
-  const JeepNiApp({super.key});
+class EJeepApp extends StatelessWidget {
+  const EJeepApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const AppScope(child: _JeepNiAppView());
+    return const AppScope(child: _EJeepAppView());
   }
 }
 
-class _JeepNiAppView extends StatefulWidget {
-  const _JeepNiAppView();
+class _EJeepAppView extends StatefulWidget {
+  const _EJeepAppView();
 
   @override
-  State<_JeepNiAppView> createState() => _JeepNiAppViewState();
+  State<_EJeepAppView> createState() => _EJeepAppViewState();
 }
 
-class _JeepNiAppViewState extends State<_JeepNiAppView> {
+class _EJeepAppViewState extends State<_EJeepAppView> {
   static const _minimumSplashDuration = Duration(milliseconds: 1600);
 
   Timer? _splashTimer;
@@ -59,18 +59,18 @@ class _JeepNiAppViewState extends State<_JeepNiAppView> {
 
     if (!isReady) {
       return MaterialApp(
-        title: 'JeepNi Tracking',
+        title: 'eJeep Tracking',
         theme: theme,
         home: SplashScreen(
           message: authService.isInitialized
-              ? 'Launching JeepNi...'
+              ? 'Launching eJeep...'
               : 'Checking your session...',
         ),
       );
     }
 
     return MaterialApp.router(
-      title: 'JeepNi Tracking',
+      title: 'eJeep Tracking',
       theme: theme,
       routerConfig: router,
     );

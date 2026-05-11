@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "978580525395",
-    "project_id": "jeepni-45b6c",
-    "storage_bucket": "jeepni-45b6c.firebasestorage.app"
+    "project_number": "145780868219",
+    "project_id": "ejeep-782c9",
+    "storage_bucket": "ejeep-782c9.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:978580525395:android:a4f9f0c6914c49da0591a6",
+        "mobilesdk_app_id": "1:145780868219:android:544652aaa5f2469d1e8ede",
         "android_client_info": {
-          "package_name": "com.arzatech.jeepni"
+          "package_name": "com.arzatech.ejeep"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBIY2IGEr-chFfuFdK7CCwLRavcCj8OcJA"
+          "current_key": "AIzaSyBdVyAMys3zcg4Hhg-EwGo4avPQMM7uz7o"
         }
       ],
       "services": {

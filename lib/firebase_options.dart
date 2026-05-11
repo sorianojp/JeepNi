@@ -5,9 +5,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'FirebaseOptions are not configured for web. Add a web app in Firebase first.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -17,9 +15,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.macOS:
         return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'FirebaseOptions are not configured for Windows. Add a Windows app in Firebase first.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'FirebaseOptions are not configured for Linux. Add a Linux app in Firebase first.',
@@ -32,28 +28,49 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBIY2IGEr-chFfuFdK7CCwLRavcCj8OcJA',
-    appId: '1:978580525395:android:a4f9f0c6914c49da0591a6',
-    messagingSenderId: '978580525395',
-    projectId: 'jeepni-45b6c',
-    storageBucket: 'jeepni-45b6c.firebasestorage.app',
+    apiKey: 'AIzaSyBdVyAMys3zcg4Hhg-EwGo4avPQMM7uz7o',
+    appId: '1:145780868219:android:544652aaa5f2469d1e8ede',
+    messagingSenderId: '145780868219',
+    projectId: 'ejeep-782c9',
+    storageBucket: 'ejeep-782c9.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyArA_ADqGErmk2LH4uf1eB2ON1S7sqNkmk',
-    appId: '1:978580525395:ios:cae594743fc5e8270591a6',
-    messagingSenderId: '978580525395',
-    projectId: 'jeepni-45b6c',
-    storageBucket: 'jeepni-45b6c.firebasestorage.app',
-    iosBundleId: 'com.arzatech.jeepni',
+    apiKey: 'AIzaSyAkfxW9A9H3NIkLOMFb6dTurSCtvSx5OEk',
+    appId: '1:145780868219:ios:d611df38dccbc5521e8ede',
+    messagingSenderId: '145780868219',
+    projectId: 'ejeep-782c9',
+    storageBucket: 'ejeep-782c9.firebasestorage.app',
+    iosBundleId: 'com.arzatech.ejeep',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyArA_ADqGErmk2LH4uf1eB2ON1S7sqNkmk',
-    appId: '1:978580525395:ios:cae594743fc5e8270591a6',
-    messagingSenderId: '978580525395',
-    projectId: 'jeepni-45b6c',
-    storageBucket: 'jeepni-45b6c.firebasestorage.app',
-    iosBundleId: 'com.arzatech.jeepni',
+    apiKey: 'AIzaSyAkfxW9A9H3NIkLOMFb6dTurSCtvSx5OEk',
+    appId: '1:145780868219:ios:440f1c4d6383bcae1e8ede',
+    messagingSenderId: '145780868219',
+    projectId: 'ejeep-782c9',
+    storageBucket: 'ejeep-782c9.firebasestorage.app',
+    iosBundleId: 'com.arzatech.ejeep',
   );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyDNzclv8MOqioETE-UXF0_5JyhA3ZSnX-4',
+    appId: '1:145780868219:web:a948f5ff617949e31e8ede',
+    messagingSenderId: '145780868219',
+    projectId: 'ejeep-782c9',
+    authDomain: 'ejeep-782c9.firebaseapp.com',
+    storageBucket: 'ejeep-782c9.firebasestorage.app',
+    measurementId: 'G-NF7F5BSN83',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyDNzclv8MOqioETE-UXF0_5JyhA3ZSnX-4',
+    appId: '1:145780868219:web:c67e954d4610b35b1e8ede',
+    messagingSenderId: '145780868219',
+    projectId: 'ejeep-782c9',
+    authDomain: 'ejeep-782c9.firebaseapp.com',
+    storageBucket: 'ejeep-782c9.firebasestorage.app',
+    measurementId: 'G-KQPZ7LLPE1',
+  );
+
 }

@@ -10,7 +10,7 @@ class AppMapTileLayer extends StatelessWidget {
       urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
       fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       subdomains: const ['a', 'b', 'c', 'd'],
-      userAgentPackageName: 'com.arzatech.jeepni',
+      userAgentPackageName: 'com.arzatech.ejeep',
       errorTileCallback: (tile, error, stackTrace) {
         debugPrint('Map tile failed: ${tile.coordinates} $error');
       },

@@ -56,7 +56,7 @@ class SplashScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 28),
                       Text(
-                        'JeepNi',
+                        'eJeep',
                         style: textTheme.displaySmall?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,

@@ -124,7 +124,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'JeepNi will remove your sign-in account, profile, and live location data for ${user.email}.',
+                    'eJeep will remove your sign-in account, profile, and live location data for ${user.email}.',
                     style: TextStyle(color: Colors.red.shade900, height: 1.4),
                   ),
                 ],

@@ -124,7 +124,7 @@ class AccountSettingsScreen extends StatelessWidget {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text(
-                                      'Allow system notifications for JeepNi to receive nearby driver alerts.',
+                                      'Allow system notifications for eJeep to receive nearby driver alerts.',
                                     ),
                                   ),
                                 );
@@ -144,7 +144,7 @@ class AccountSettingsScreen extends StatelessWidget {
                         leading: const Icon(Icons.app_settings_alt_outlined),
                         title: const Text('System Notification Settings'),
                         subtitle: const Text(
-                          'Open app settings and allow notifications for JeepNi.',
+                          'Open app settings and allow notifications for eJeep.',
                         ),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: nearbyDriverAlertService.openAppSettings,
@@ -171,7 +171,7 @@ class AccountSettingsScreen extends StatelessWidget {
                               content: Text(
                                 sent
                                     ? 'Test notification sent.'
-                                    : 'Enable system notifications for JeepNi first.',
+                                    : 'Enable system notifications for eJeep first.',
                               ),
                             ),
                           );
@@ -198,7 +198,7 @@ class AccountSettingsScreen extends StatelessWidget {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.info_outline),
-                    title: const Text('About JeepNi'),
+                    title: const Text('About eJeep'),
                     subtitle: const Text(
                       'View app details and feature summary.',
                     ),

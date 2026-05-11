@@ -10,7 +10,7 @@ class AboutAppScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('About JeepNi'),
+        title: const Text('About eJeep'),
         backgroundColor: _aboutPrimaryColor,
         foregroundColor: Colors.white,
       ),
@@ -54,7 +54,7 @@ class AboutAppScreen extends StatelessWidget {
                           const SizedBox(width: 14),
                           const Flexible(
                             child: Text(
-                              'JeepNi',
+                              'eJeep',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 28,
@@ -223,9 +223,9 @@ class AboutAppScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 const _AboutSectionCard(
                   icon: Icons.info_outline,
-                  title: 'What JeepNi Does',
+                  title: 'What eJeep Does',
                   body:
-                      'JeepNi helps students view active drivers, lets drivers share their live position, and gives admins live operational visibility.',
+                      'eJeep helps students view active drivers, lets drivers share their live position, and gives admins live operational visibility.',
                 ),
                 const SizedBox(height: 12),
                 const _AboutSectionCard(

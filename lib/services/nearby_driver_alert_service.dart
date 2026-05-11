@@ -167,7 +167,7 @@ class NearbyDriverAlertService extends ChangeNotifier
 
     await _notificationsPlugin.show(
       id: _testNotificationId,
-      title: 'JeepNi notification test',
+      title: 'eJeep notification test',
       body: 'Nearby driver alerts are ready on this device.',
       notificationDetails: const NotificationDetails(
         android: androidDetails,
