@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-const Color _aboutPrimaryColor = Color(0xFF0D47A1);
+const Color _aboutPrimaryColor = Color(0xFF05056A);
 const Color _aboutAccentColor = Color(0xFF1A237E);
 
 class AboutAppScreen extends StatelessWidget {

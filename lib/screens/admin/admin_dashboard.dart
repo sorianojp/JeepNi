@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/app_routes.dart';
 
 const Color _adminThemeColor = Color(0xFF1A237E);
-const Color _driverThemeColor = Color(0xFF0D47A1);
+const Color _driverThemeColor = Color(0xFF05056A);
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});

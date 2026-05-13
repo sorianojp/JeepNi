@@ -18,7 +18,7 @@ import '../../widgets/tracking_status_widgets.dart';
 
 const double _studentOverlayRadius = 18;
 const Color _studentThemeColor = Color(0xFF212121);
-const Color _driverThemeColor = Color(0xFF0D47A1);
+const Color _driverThemeColor = Color(0xFF05056A);
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});

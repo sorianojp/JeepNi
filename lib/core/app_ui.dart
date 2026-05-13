@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppUi {
-  static const Color primaryBlue = Color(0xFF0D47A1);
+  static const Color primaryBlue = Color(0xFF05056A);
   static const Color accentAmber = Color(0xFFFFB300);
   static const Color formSurface = Color(0xFFF1F5F9);
   static const Color panelSurface = Color(0xFFF8FAFC);

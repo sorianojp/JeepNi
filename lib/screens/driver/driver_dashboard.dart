@@ -19,7 +19,7 @@ import '../../widgets/tracking_status_widgets.dart';
 const double _driverOverlayRadius = 18;
 const double _mapMarkerIconSize = 44;
 const Color _studentThemeColor = Color(0xFF212121);
-const Color _driverThemeColor = Color(0xFF0D47A1);
+const Color _driverThemeColor = Color(0xFF05056A);
 
 class _StudentCluster {
   _StudentCluster(this.center, this.count, this.updatedAt);

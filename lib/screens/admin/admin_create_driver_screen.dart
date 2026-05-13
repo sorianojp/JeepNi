@@ -8,7 +8,7 @@ import '../../widgets/app_primary_button.dart';
 import '../../widgets/app_text_field.dart';
 
 const Color _adminThemeColor = Color(0xFF1A237E);
-const Color _driverThemeColor = Color(0xFF0D47A1);
+const Color _driverThemeColor = Color(0xFF05056A);
 
 class AdminCreateDriverScreen extends StatefulWidget {
   const AdminCreateDriverScreen({super.key});

@@ -11,7 +11,7 @@ class SplashScreen extends StatelessWidget {
 
     return Scaffold(
       body: DecoratedBox(
-        decoration: const BoxDecoration(color: Color(0xFF0D47A1)),
+        decoration: const BoxDecoration(color: Color(0xFF05056A)),
         child: SafeArea(
           child: Stack(
             children: [

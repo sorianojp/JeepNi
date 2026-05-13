@@ -14,7 +14,7 @@ import '../../widgets/map_recenter_button.dart';
 import '../../widgets/tracking_diagnostics_sheet.dart';
 
 const Color _adminThemeColor = Color(0xFF1A237E);
-const Color _driverThemeColor = Color(0xFF0D47A1);
+const Color _driverThemeColor = Color(0xFF05056A);
 const Color _studentThemeColor = Color(0xFF212121);
 
 class AdminMapScreen extends StatefulWidget {
