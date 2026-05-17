@@ -28,23 +28,9 @@ class SplashScreen extends StatelessWidget {
                         builder: (context, value, child) {
                           return Transform.scale(scale: value, child: child);
                         },
-                        child: Container(
+                        child: SizedBox(
                           width: 112,
                           height: 112,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(30),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.26),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.12),
-                                blurRadius: 24,
-                                offset: const Offset(0, 14),
-                              ),
-                            ],
-                          ),
                           child: Padding(
                             padding: const EdgeInsets.all(12),
                             child: Image.asset(

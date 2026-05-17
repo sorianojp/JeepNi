@@ -41,15 +41,13 @@ class AboutAppScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
+                          SizedBox(
                             width: 76,
                             height: 76,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.16),
-                              shape: BoxShape.circle,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Image.asset('assets/logo.png'),
                             ),
-                            child: Image.asset('assets/logo.png'),
                           ),
                           const SizedBox(width: 14),
                           const Flexible(
