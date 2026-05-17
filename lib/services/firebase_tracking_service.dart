@@ -28,6 +28,7 @@ class FirebaseTrackingService extends ChangeNotifier {
   final Map<String, double> _userSpeedsKmh = <String, double>{};
   final Map<String, double> _userAccuraciesMeters = <String, double>{};
   final Map<String, DateTime> _userLocationUpdatedAt = <String, DateTime>{};
+  final Map<String, bool> _driverFullStatuses = <String, bool>{};
   final Map<String, String> _userRoles = <String, String>{};
   final Map<String, _TrackedLocation> _visibleLocationCache =
       <String, _TrackedLocation>{};
@@ -376,6 +377,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     _userSpeedsKmh.clear();
     _userAccuraciesMeters.clear();
     _userLocationUpdatedAt.clear();
+    _driverFullStatuses.clear();
 
     for (final entry in _visibleLocationCache.entries) {
       _applyTrackedLocation(entry.key, entry.value);
@@ -402,6 +404,11 @@ class FirebaseTrackingService extends ChangeNotifier {
     }
     _userLocationUpdatedAt[userId] = trackedLocation.updatedAt;
     _userRoles[userId] = trackedLocation.role;
+    if (trackedLocation.role == 'driver') {
+      _driverFullStatuses[userId] = trackedLocation.isFull;
+    } else {
+      _driverFullStatuses.remove(userId);
+    }
   }
 
   _TrackedLocation? _trackedLocationFromDoc(
@@ -424,10 +431,12 @@ class FirebaseTrackingService extends ChangeNotifier {
 
     final speedKmh = data['speedKmh'];
     final accuracyMeters = data['accuracyMeters'];
+    final isFull = data['isFull'];
     return _TrackedLocation(
       location: LatLng(latitude.toDouble(), longitude.toDouble()),
       speedKmh: speedKmh is num ? speedKmh.toDouble() : null,
       accuracyMeters: accuracyMeters is num ? accuracyMeters.toDouble() : null,
+      isFull: isFull is bool ? isFull : false,
       updatedAt: updatedAt,
       role: role,
     );
@@ -489,6 +498,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     _userSpeedsKmh.clear();
     _userAccuraciesMeters.clear();
     _userLocationUpdatedAt.clear();
+    _driverFullStatuses.clear();
     _userLocations.clear();
     _visibleLocationCache.clear();
     _ownLocationCache = null;
@@ -582,6 +592,7 @@ class FirebaseTrackingService extends ChangeNotifier {
     _userSpeedsKmh.remove(userId);
     _userAccuraciesMeters.remove(userId);
     _userLocationUpdatedAt.remove(userId);
+    _driverFullStatuses.remove(userId);
     _visibleLocationCache.remove(userId);
     if (_listeningUserId == userId) {
       _ownLocationCache = null;
@@ -745,29 +756,43 @@ class FirebaseTrackingService extends ChangeNotifier {
       forceStopped: forceStopped,
     );
     final now = DateTime.now();
+    final isFull = role == 'driver'
+        ? (_driverFullStatuses[userId] ?? false)
+        : false;
     _lastPosition = position;
     _userLocations[userId] = nextLocation;
     _userSpeedsKmh[userId] = speedKmh;
     _userAccuraciesMeters[userId] = position.accuracy;
     _userLocationUpdatedAt[userId] = now;
     _userRoles[userId] = role;
+    if (role == 'driver') {
+      _driverFullStatuses[userId] = isFull;
+    }
     if (_listeningUserId == userId) {
       _ownLocationCache = _TrackedLocation(
         location: nextLocation,
         speedKmh: speedKmh,
         accuracyMeters: position.accuracy,
+        isFull: isFull,
         updatedAt: now,
         role: role,
       );
     }
-    await FirebaseFirestore.instance.collection('locations').doc(userId).set({
+    final locationData = <String, Object?>{
       'latitude': position.latitude,
       'longitude': position.longitude,
       'accuracyMeters': position.accuracy,
       'speedKmh': speedKmh,
       'role': role,
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+    if (role == 'driver') {
+      locationData['isFull'] = isFull;
+    }
+    await FirebaseFirestore.instance
+        .collection('locations')
+        .doc(userId)
+        .set(locationData);
     notifyListeners();
   }
 
@@ -896,6 +921,11 @@ class FirebaseTrackingService extends ChangeNotifier {
     return _userAccuraciesMeters[userId];
   }
 
+  bool isDriverFull(String userId) {
+    _ensureListening();
+    return _driverFullStatuses[userId] ?? false;
+  }
+
   DateTime? getLocationUpdatedAt(String userId) {
     _ensureListening();
     return _userLocationUpdatedAt[userId];
@@ -932,13 +962,47 @@ class FirebaseTrackingService extends ChangeNotifier {
     _userLocations[userId] = newLocation;
     _userAccuraciesMeters.remove(userId);
     _userLocationUpdatedAt[userId] = DateTime.now();
-    await FirebaseFirestore.instance.collection('locations').doc(userId).set({
+    final isFull = role == 'driver'
+        ? (_driverFullStatuses[userId] ?? false)
+        : false;
+    final locationData = <String, Object?>{
       'latitude': newLocation.latitude,
       'longitude': newLocation.longitude,
       'role': role,
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+    if (role == 'driver') {
+      locationData['isFull'] = isFull;
+    }
+    await FirebaseFirestore.instance
+        .collection('locations')
+        .doc(userId)
+        .set(locationData);
     notifyListeners();
+  }
+
+  Future<void> updateDriverFullStatus(String userId, bool isFull) async {
+    _ensureListening();
+    final currentUser = fb.FirebaseAuth.instance.currentUser;
+    if (currentUser?.uid != userId) {
+      return;
+    }
+
+    final role = await _roleForUser(userId);
+    if (role != 'driver') {
+      return;
+    }
+
+    _driverFullStatuses[userId] = isFull;
+    final ownLocation = _ownLocationCache;
+    if (ownLocation != null && ownLocation.role == 'driver') {
+      _ownLocationCache = ownLocation.copyWith(isFull: isFull);
+    }
+
+    notifyListeners();
+    await FirebaseFirestore.instance.collection('locations').doc(userId).set({
+      'isFull': isFull,
+    }, SetOptions(merge: true));
   }
 
   Future<String> _roleForUser(String userId) async {
@@ -985,6 +1049,7 @@ class FirebaseTrackingService extends ChangeNotifier {
       _userSpeedsKmh.remove(userId);
       _userAccuraciesMeters.remove(userId);
       _userLocationUpdatedAt.remove(userId);
+      _driverFullStatuses.remove(userId);
       _visibleLocationCache.remove(userId);
       if (_listeningUserId == userId) {
         _ownLocationCache = null;
@@ -1011,11 +1076,24 @@ class _TrackedLocation {
     required this.role,
     this.speedKmh,
     this.accuracyMeters,
+    this.isFull = false,
   });
 
   final LatLng location;
   final double? speedKmh;
   final double? accuracyMeters;
+  final bool isFull;
   final DateTime updatedAt;
   final String role;
+
+  _TrackedLocation copyWith({bool? isFull}) {
+    return _TrackedLocation(
+      location: location,
+      speedKmh: speedKmh,
+      accuracyMeters: accuracyMeters,
+      isFull: isFull ?? this.isFull,
+      updatedAt: updatedAt,
+      role: role,
+    );
+  }
 }

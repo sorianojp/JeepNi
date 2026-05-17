@@ -230,6 +230,7 @@ class _DriverDashboardState extends State<DriverDashboard>
 
     final myLocation = trackingService.getLocation(user.id);
     final speedKmh = trackingService.getSpeedKmh(user.id);
+    final isEjeepFull = trackingService.isDriverFull(user.id);
     final isSharing = trackingService.isSharingLocation(user.id);
     final isStarting = trackingService.isStartingLocationStream;
     final locationError = trackingService.locationError;
@@ -324,13 +325,17 @@ class _DriverDashboardState extends State<DriverDashboard>
                     statusLabel: statusLabel,
                     statusIcon: statusIcon,
                     statusColor: statusColor,
+                    isEjeepFull: isEjeepFull,
+                    canUpdateFullStatus: myLocation != null,
+                    onToggleFullStatus: () => trackingService
+                        .updateDriverFullStatus(user.id, !isEjeepFull),
                   ),
                 ),
                 if (locationError != null)
                   Positioned(
                     left: 12,
                     right: 12,
-                    top: 100,
+                    top: 150,
                     child: TrackingErrorBanner(
                       message: locationError,
                       onRetry: () =>
@@ -344,7 +349,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                   Positioned(
                     left: 12,
                     right: 12,
-                    top: 100,
+                    top: 150,
                     child: LocationOnboardingCard(
                       title: 'Driver tracking starts automatically',
                       message:
@@ -422,7 +427,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                   color: _driverThemeColor,
                   heroTag: 'driver-recenter-location',
                   alignment: Alignment.topRight,
-                  padding: const EdgeInsets.only(top: 88, right: 16),
+                  padding: const EdgeInsets.only(top: 142, right: 16),
                   onPressed: () => _recenterToDriverLocation(myLocation),
                 ),
                 Positioned(
@@ -435,13 +440,17 @@ class _DriverDashboardState extends State<DriverDashboard>
                     statusLabel: statusLabel,
                     statusIcon: statusIcon,
                     statusColor: statusColor,
+                    isEjeepFull: isEjeepFull,
+                    canUpdateFullStatus: myLocation != null,
+                    onToggleFullStatus: () => trackingService
+                        .updateDriverFullStatus(user.id, !isEjeepFull),
                   ),
                 ),
                 if (trackingService.locationError != null)
                   Positioned(
                     left: 12,
                     right: 12,
-                    top: 86,
+                    top: 150,
                     child: TrackingErrorBanner(
                       message: trackingService.locationError!,
                       onRetry: () =>
@@ -455,7 +464,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                   Positioned(
                     left: 12,
                     right: 12,
-                    top: 86,
+                    top: 150,
                     child: LocationOnboardingCard(
                       title: 'Waiting for your live location',
                       message:
@@ -495,6 +504,9 @@ class _DriverMapControls extends StatelessWidget {
     required this.statusLabel,
     required this.statusIcon,
     required this.statusColor,
+    required this.isEjeepFull,
+    required this.canUpdateFullStatus,
+    required this.onToggleFullStatus,
   });
 
   final String driverName;
@@ -502,77 +514,110 @@ class _DriverMapControls extends StatelessWidget {
   final String statusLabel;
   final IconData statusIcon;
   final Color statusColor;
+  final bool isEjeepFull;
+  final bool canUpdateFullStatus;
+  final VoidCallback onToggleFullStatus;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(_driverOverlayRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(_driverOverlayRadius),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            const Icon(Icons.directions_bus, color: _driverThemeColor),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    driverName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                const Icon(Icons.directions_bus, color: _driverThemeColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        driverName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 5),
+                      TrackingStatusPill(
+                        label: statusLabel,
+                        icon: statusIcon,
+                        color: statusColor,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 5),
-                  TrackingStatusPill(
-                    label: statusLabel,
-                    icon: statusIcon,
-                    color: statusColor,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: _driverThemeColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: _driverThemeColor.withValues(alpha: 0.26),
                 ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.speed, size: 18, color: _driverThemeColor),
-                    const SizedBox(width: 4),
-                    Text(
-                      speedLabel,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                const SizedBox(width: 8),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _driverThemeColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: _driverThemeColor.withValues(alpha: 0.26),
                     ),
-                  ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.speed,
+                          size: 18,
+                          color: _driverThemeColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          speedLabel,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 52,
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: isEjeepFull ? Colors.red : _driverThemeColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              textStyle: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            onPressed: canUpdateFullStatus ? onToggleFullStatus : null,
+            icon: Icon(
+              isEjeepFull ? Icons.event_seat : Icons.event_seat_outlined,
+              size: 22,
+            ),
+            label: Text(isEjeepFull ? 'EJeep is Full' : 'Mark EJeep Full'),
+          ),
+        ),
+      ],
     );
   }
 }

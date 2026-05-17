@@ -46,6 +46,7 @@ service cloud.firestore {
           'longitude',
           'accuracyMeters',
           'speedKmh',
+          'isFull',
           'role',
           'updatedAt'
         ])
@@ -55,7 +56,40 @@ service cloud.firestore {
         && validRole(data.role)
         && data.updatedAt is timestamp
         && (!data.keys().hasAny(['accuracyMeters']) || data.accuracyMeters is number)
-        && (!data.keys().hasAny(['speedKmh']) || data.speedKmh is number);
+        && (!data.keys().hasAny(['speedKmh']) || data.speedKmh is number)
+        && (!data.keys().hasAny(['isFull']) || (data.role == 'driver' && data.isFull is bool));
+    }
+
+    function validSchedule(data) {
+      return data.keys().hasOnly([
+          'ejeepName',
+          'route',
+          'dayRange',
+          'startTime',
+          'endTime',
+          'day',
+          'departureTime',
+          'isActive',
+          'notes',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasAll(['ejeepName', 'route', 'isActive'])
+        && (
+          data.keys().hasAll(['dayRange', 'startTime', 'endTime'])
+          || data.keys().hasAll(['day', 'departureTime'])
+        )
+        && data.ejeepName is string
+        && data.route is string
+        && data.isActive is bool
+        && (!data.keys().hasAny(['dayRange']) || data.dayRange is string)
+        && (!data.keys().hasAny(['startTime']) || data.startTime is string)
+        && (!data.keys().hasAny(['endTime']) || data.endTime is string)
+        && (!data.keys().hasAny(['day']) || data.day is string)
+        && (!data.keys().hasAny(['departureTime']) || data.departureTime is string)
+        && (!data.keys().hasAny(['notes']) || data.notes is string)
+        && (!data.keys().hasAny(['createdAt']) || data.createdAt is timestamp)
+        && (!data.keys().hasAny(['updatedAt']) || data.updatedAt is timestamp);
     }
 
     match /users/{userId} {
@@ -111,6 +145,16 @@ service cloud.firestore {
         && request.resource.data.role == get(/databases/$(database)/documents/users/$(userId)).data.role;
 
       allow delete: if isOwnDoc(userId);
+    }
+
+    match /schedules/{scheduleId} {
+      allow read: if signedIn();
+
+      allow create, update: if signedIn()
+        && isAdmin(request.auth.uid)
+        && validSchedule(request.resource.data);
+
+      allow delete: if signedIn() && isAdmin(request.auth.uid);
     }
   }
 }

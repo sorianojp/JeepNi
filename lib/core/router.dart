@@ -5,10 +5,12 @@ import '../screens/account/account_settings_screen.dart';
 import '../screens/account/delete_account_screen.dart';
 import '../screens/about/about_app_screen.dart';
 import '../screens/student/student_dashboard.dart';
+import '../screens/student/student_schedule_screen.dart';
 import '../screens/driver/driver_dashboard.dart';
 import '../screens/admin/admin_dashboard.dart';
 import '../screens/admin/admin_create_driver_screen.dart';
 import '../screens/admin/admin_map_screen.dart';
+import '../screens/admin/admin_schedule_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../services/firebase_auth_service.dart';
 import '../models/user_model.dart';
@@ -74,6 +76,10 @@ GoRouter createRouter(FirebaseAuthService authService) {
         builder: (context, state) => const StudentDashboard(),
       ),
       GoRoute(
+        path: AppRoutes.studentSchedules,
+        builder: (context, state) => const StudentScheduleScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.driver,
         builder: (context, state) => const DriverDashboard(),
       ),
@@ -88,6 +94,10 @@ GoRouter createRouter(FirebaseAuthService authService) {
       GoRoute(
         path: AppRoutes.adminDrivers,
         builder: (context, state) => const AdminCreateDriverScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.adminSchedules,
+        builder: (context, state) => const AdminScheduleScreen(),
       ),
     ],
   );

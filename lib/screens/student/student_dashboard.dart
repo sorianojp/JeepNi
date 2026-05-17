@@ -252,6 +252,11 @@ class _StudentDashboardState extends State<StudentDashboard>
             tooltip: 'Account settings',
             onPressed: () => context.push(AppRoutes.accountSettings),
           ),
+          IconButton(
+            icon: const Icon(Icons.event_note),
+            tooltip: 'EJeep schedule',
+            onPressed: () => context.push(AppRoutes.studentSchedules),
+          ),
         ],
       ),
       body: mapCenter == null
@@ -362,6 +367,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                               speedLabel: _speedLabel(
                                 trackingService.getSpeedKmh(driver.key),
                               ),
+                              isFull: trackingService.isDriverFull(driver.key),
                               freshnessLabel: trackingService
                                   .locationFreshnessLabel(driver.key),
                               isFollowed: driver.key == _followedDriverId,
@@ -459,19 +465,25 @@ class _StudentDashboardState extends State<StudentDashboard>
 class _DriverMapMarker extends StatelessWidget {
   const _DriverMapMarker({
     required this.speedLabel,
+    required this.isFull,
     required this.freshnessLabel,
     required this.isFollowed,
     required this.isFresh,
   });
 
   final String speedLabel;
+  final bool isFull;
   final String freshnessLabel;
   final bool isFollowed;
   final bool isFresh;
 
   @override
   Widget build(BuildContext context) {
-    final color = isFollowed ? Colors.orange : _driverThemeColor;
+    final color = isFull
+        ? Colors.red
+        : isFollowed
+        ? Colors.orange
+        : _driverThemeColor;
 
     return Opacity(
       opacity: isFresh ? 1 : 0.58,
@@ -479,23 +491,51 @@ class _DriverMapMarker extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.directions_bus, color: color, size: isFollowed ? 46 : 40),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.92),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: color.withValues(alpha: 0.35)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              child: Text(
-                speedLabel,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: color.withValues(alpha: 0.35)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  child: Text(
+                    speedLabel,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              if (isFull) ...[
+                const SizedBox(width: 4),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Text(
+                      'Full',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
           Text(
             freshnessLabel.replaceFirst('Updated ', ''),
@@ -898,6 +938,9 @@ class _DriversBottomSheetState extends State<_DriversBottomSheet> {
                               .locationFreshnessLabel(driverId);
                           final isFresh = widget.trackingService
                               .isLocationFresh(driverId);
+                          final isFull = widget.trackingService.isDriverFull(
+                            driverId,
+                          );
 
                           return ListTile(
                             dense: true,
@@ -910,9 +953,11 @@ class _DriversBottomSheetState extends State<_DriversBottomSheet> {
                                     driverLocation,
                                   ),
                             leading: Icon(
-                              Icons.directions_bus,
+                              isFull ? Icons.event_seat : Icons.directions_bus,
                               color: driverId == widget.followedDriverId
                                   ? Colors.orange
+                                  : isFull
+                                  ? Colors.red
                                   : isFresh
                                   ? _driverThemeColor
                                   : Colors.grey,
@@ -925,6 +970,32 @@ class _DriversBottomSheetState extends State<_DriversBottomSheet> {
                             subtitle: Text(
                               '${widget.distanceLabel(widget.myLocation, driverLocation)} • ${widget.speedLabel(driverSpeedKmh)} • $freshnessLabel',
                             ),
+                            trailing: isFull
+                                ? DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(
+                                        color: Colors.red.withValues(
+                                          alpha: 0.28,
+                                        ),
+                                      ),
+                                    ),
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 9,
+                                        vertical: 5,
+                                      ),
+                                      child: Text(
+                                        'Full',
+                                        style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : null,
                           );
                         },
                       ),
